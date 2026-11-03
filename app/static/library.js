@@ -382,7 +382,7 @@ function libRenderMwDlg() {
   const s = LIB.mw; if (!s) return;
   const sum = s.summary;
   const parts = [];
-  if (!s.connected) parts.push(`<p class="warn-box">Nicht mit dem Bambu-Konto verbunden. Unter <b>Bambu &amp; AMS → Drucker &amp; Konto</b> anmelden – dann werden deine Sammlungen (auch private) synchronisiert und 3MF-Dateien geladen. Öffentliche Sammlungen lassen sich auch ohne Anmeldung übernehmen (ohne Dateien).</p>`);
+  if (!s.connected) parts.push(`<p class="warn-box">Nicht mit dem Bambu-Konto verbunden. Unter <b>Drucker → Einrichten</b> anmelden – dann werden deine Sammlungen (auch private) synchronisiert und 3MF-Dateien geladen. Öffentliche Sammlungen lassen sich auch ohne Anmeldung übernehmen (ohne Dateien).</p>`);
   parts.push(s.running ? `<p><b>${esc(s.phase)}</b> ${s.total ? `${s.done} / ${s.total}` : ""}</p><div class="mw-bar"><i style="width:${s.total ? s.done / s.total * 100 : 10}%"></i></div>`
     : `<p class="small">${s.last_sync ? `Zuletzt synchronisiert: ${fmtTime(s.last_sync)}` : "Noch nicht synchronisiert."}${s.pending ? ` · ${s.pending} Dateien ausstehend` : ""}${s.failed ? ` · <span class="err">${s.failed} Downloads fehlgeschlagen</span>` : ""}</p>`);
   if (s.error) parts.push(`<p class="err small">⚠ ${esc(s.error)}</p>`);

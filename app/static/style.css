@@ -281,6 +281,10 @@ legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
 .rfidv { cursor: help; }
 .rfidrow { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px dashed var(--line); }
 .rfidrow:last-child { border-bottom: 0; }
+.rfidrow.flash { animation: flash 1.6s ease 2; }
+.tagbtn { cursor: pointer; font: inherit; font-size: 11.5px; background: transparent; min-height: 0; }
+.tagbtn.add { color: var(--muted); border-style: dashed; }
+.tagbtn.add:hover { color: var(--accent); border-color: var(--accent); }
 .rfidrow button { margin-left: auto; padding: 2px 8px; font-size: 12px; }
 .rfid .row { margin-top: 8px; } .rfid select { width: 100%; }
 @media (max-width: 800px) { .bb-head { grid-template-columns: 1fr; } }
@@ -975,11 +979,6 @@ td .rflag { font-size: 10.5px; padding: 2px 7px 2px 5px; }
 }
 label.file-btn.primary { background: var(--grad); color: var(--accent-ink); border: 0; font-weight: 600; padding: 8px 14px; display: inline-flex; align-items: center; border-radius: 9px; }
 @media (max-width: 700px) {
-  /* 8 Reiter: kleinere Beschriftung statt abgeschnittener Wörter */
-  .tabs { padding-left: 2px; padding-right: 2px; gap: 0; }
-  .tabs button { font-size: 9.5px; letter-spacing: -.2px; }
-  .tabs .lbl { overflow: visible; text-overflow: clip; }
-  .tabs .icw { width: 40px; }
   /* Bibliothek kompakt */
   .lib-toolbar { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .lib-toolbar #libQ { grid-column: 1 / -1; }
@@ -988,7 +987,6 @@ label.file-btn.primary { background: var(--grad); color: var(--accent-ink); bord
   .lib-toolbar #libColsBtn, .lib-toolbar #libMwBtn, .lib-toolbar #libUploadBtn { grid-column: span 2; justify-content: center; padding-left: 4px; padding-right: 4px; font-size: 13px; white-space: nowrap; }
   .lib-cover { aspect-ratio: auto; height: 190px; }
 }
-@media (max-width: 380px) { .tabs button { font-size: 9px; } }
 @media (max-width: 700px) { .lib-ctags { max-height: 42px; overflow: hidden; } .lib-badges { flex-direction: column; align-items: flex-start; } }
 
 /* ---------- Kalkulation & Angebote ---------- */
@@ -1079,3 +1077,26 @@ label.file-btn.primary { background: var(--grad); color: var(--accent-ink); bord
 .cx-libitem span { display: grid; min-width: 0; }
 @media (max-width: 960px) { .cx-grid { grid-template-columns: minmax(0, 1fr); } .cx-result { position: static; } .cx-add { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .cx-form, .cx-form3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cx-paper { padding: 22px 18px; } .cx-src-acts { margin-left: 0; } }
+
+/* Unterseiten des gewählten Bereichs (ersetzt die Unterleiste von „Bambu & AMS“) */
+.groupnav { margin: 0 0 14px; }
+.groupnav .seg { display: inline-flex; }
+.groupnav .seg[hidden] { display: none; }
+.groupnav button { padding: 8px 16px; white-space: nowrap; }
+.groupnav b { display: inline-block; min-width: 18px; margin-left: 4px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font-size: 11px; }
+.groupnav b:empty { display: none; }
+#tab-bambu .bambu-sub { display: none; }
+@media (max-width: 700px) {
+  .tabs button { font-size: 11px; }
+  .groupnav { margin: 0 0 12px; }
+  .groupnav:not(:has(.seg:not([hidden]))) { display: none; }
+  .groupnav .seg { display: flex; width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .groupnav .seg::-webkit-scrollbar { display: none; }
+  .groupnav button { flex: 1 0 auto; padding: 9px 10px; min-height: 40px; }
+}
+@media (max-width: 700px) {
+  /* zweite Ebene (Kalkulation) als eine scrollbare Zeile statt 2×2-Raster */
+  #cxNav { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  #cxNav::-webkit-scrollbar { display: none; }
+  #cxNav button { flex: 1 0 auto; padding: 8px 12px; white-space: nowrap; }
+}
