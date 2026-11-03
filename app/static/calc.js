@@ -26,6 +26,9 @@ function cxNewJob() {
 }
 const cxSaveJob = () => store.set("cxJob", CX.job);
 const cxPlate = () => CX.job.plates[CX.job.plate] || CX.job.plates[0];
+/* Berechnet wird das komplette Projekt (alle Platten = ein Stück) oder nur die gewählte Platte */
+const cxScope = () => CX.job.plates.length > 1 && CX.job.scope === "plate" ? "plate" : "all";
+const cxCalcPlates = () => cxScope() === "plate" ? [cxPlate()] : CX.job.plates;
 const cxFil = id => CX.fils.find(f => f.id === id) || null;
 const cxPrinter = () => CX.printers.find(p => p.key === CX.job.printer) || CX.printers[0] || { name: "–", price: 0, life: 5000, watt: 0, wear: 0 };
 const cxProfile = () => CX.cfg.profiles.find(p => p.id === CX.job.profile) || CX.cfg.profiles[0];
@@ -38,23 +41,33 @@ function cxRound(u) {
   const step = +r || 0.01; return Math.ceil((u - 1e-9) / step) * step;
 }
 function cxCalc(qty) {
-  const p = cxPlate(), P = cxPrinter(), R = cxProfile(), st = CX.cfg.settings, ppp = Math.max(1, p.ppp | 0);
-  const plateMat = p.lines.reduce((a, l) => a + l.grams * cxPerKg(l.fil) / 1000, 0) + (p.lines[0] ? p.purge * cxPerKg(p.lines[0].fil) / 1000 : 0);
-  const h = p.hours / ppp * qty, plates = Math.ceil(qty / ppp);
-  const parts = {
-    mat: plateMat / ppp * qty, strom: h * (+P.watt || 0) / 1000 * CX.kwh, masch: h * (+P.price || 0) / Math.max(1, +P.life || 1),
-    wear: h * (+P.wear || 0), labor: R.rate > 0 ? (plates * CX.job.prep + qty * CX.job.post) / 60 * R.rate : 0,
-    extra: qty * CX.job.extras.reduce((a, x) => a + x.price * x.n, 0),
-  };
+  const P = cxPrinter(), R = cxProfile(), st = CX.cfg.settings;
+  const parts = { mat: 0, strom: 0, masch: 0, wear: 0, labor: 0, extra: 0 };
+  let h = 0, plates = 0, grams = 0;
+  for (const p of cxCalcPlates()) {
+    const ppp = Math.max(1, p.ppp | 0), runs = Math.ceil(qty / ppp), ph = p.hours / ppp * qty;
+    const plateMat = p.lines.reduce((a, l) => a + l.grams * cxPerKg(l.fil) / 1000, 0) + (p.lines[0] ? p.purge * cxPerKg(p.lines[0].fil) / 1000 : 0);
+    parts.mat += plateMat / ppp * qty;
+    parts.strom += ph * (+P.watt || 0) / 1000 * CX.kwh;
+    parts.masch += ph * (+P.price || 0) / Math.max(1, +P.life || 1);
+    parts.wear += ph * (+P.wear || 0);
+    if (R.rate > 0) parts.labor += runs * CX.job.prep / 60 * R.rate;          // Rüsten je Plattendurchlauf
+    h += ph; plates += runs;
+    grams += (p.lines.reduce((a, l) => a + l.grams, 0) + (p.lines.length ? p.purge : 0)) / ppp * qty;
+  }
+  if (R.rate > 0) parts.labor += qty * CX.job.post / 60 * R.rate;            // Nacharbeit je fertigem Teil
+  parts.extra = qty * CX.job.extras.reduce((a, x) => a + x.price * x.n, 0);
   parts.risk = (parts.mat + parts.strom + parts.masch + parts.wear) * R.risk / 100;
   const cost = Object.values(parts).reduce((a, b) => a + b, 0), net = cost * (1 + R.margin / 100);
   const gross = st.klein ? net : net * (1 + st.vat / 100), unit = cxRound(gross / qty);
-  const grams = (p.lines.reduce((a, l) => a + l.grams, 0) + (p.lines.length ? p.purge : 0)) / ppp * qty;
   return { parts, cost, net, gross, unit, total: unit * qty, plates, h, grams };
 }
 function cxStock(qty) {
-  const p = cxPlate(), ppp = Math.max(1, p.ppp | 0), need = {};
-  p.lines.forEach((l, i) => { need[l.fil] = (need[l.fil] || 0) + l.grams / ppp * qty + (i === 0 ? p.purge / ppp * qty : 0); });
+  const need = {};
+  for (const p of cxCalcPlates()) {
+    const ppp = Math.max(1, p.ppp | 0);
+    p.lines.forEach((l, i) => { need[l.fil] = (need[l.fil] || 0) + l.grams / ppp * qty + (i === 0 ? p.purge / ppp * qty : 0); });
+  }
   return Object.entries(need).map(([id, g]) => ({ f: cxFil(+id), g })).filter(x => x.f && x.f.stock_g < x.g);
 }
 
@@ -94,8 +107,13 @@ function cxRenderCalc() {
   $("#cxFile").textContent = j.file || "Eigenes Projekt";
   $("#cxMeta").textContent = j.meta || "Werte eintragen oder eine 3MF laden";
   $("#cxPlateSrc").textContent = j.source === "manual" ? "manuelle Eingabe" : j.source === "library" ? "aus der Bibliothek" : "aus slice_info.config";
-  $("#cxPlates").innerHTML = j.plates.length > 1 || j.source !== "manual" ? j.plates.map((x, i) =>
-    `<button type="button" data-plate="${i}" class="${i === j.plate ? "active" : ""}">Platte ${x.n} · ${cxNum(x.hours)} h</button>`).join("") : "";
+  const multi = j.plates.length > 1, all = cxScope() === "all";
+  $("#cxPlates").innerHTML = (multi ? `<div class="seg mini cx-scope" role="group" aria-label="Berechnen">
+      <button type="button" data-scope="all" class="${all ? "active" : ""}">Komplett · ${j.plates.length} Platten · ${cxNum(j.plates.reduce((a, x) => a + (+x.hours || 0), 0))} h</button>
+      <button type="button" data-scope="plate" class="${all ? "" : "active"}">Nur Platte ${p.n}</button></div>
+      <span class="muted small cx-edit">${all ? "Bearbeiten:" : "Platte:"}</span>` : "") +
+    (multi || j.source !== "manual" ? j.plates.map((x, i) =>
+      `<button type="button" data-plate="${i}" class="${i === j.plate ? "active" : ""}">Platte ${x.n} · ${cxNum(x.hours)} h</button>`).join("") : "");
   $("#cxH").value = p.hours; $("#cxPpp").value = p.ppp; $("#cxPurge").value = p.purge;
   $("#cxPrinter").innerHTML = CX.printers.map(x => `<option value="${esc(x.key)}" ${x.key === j.printer ? "selected" : ""}>${esc(x.name)}</option>`).join("")
     || `<option value="">Kein Drucker – unter „Drucker & Profile“ anlegen</option>`;
@@ -121,7 +139,7 @@ function cxRenderCalc() {
 function cxRenderResult() {
   if (!CX.job) return;
   const q = Math.max(1, CX.job.qty | 0), r = cxCalc(q), R = cxProfile(), st = CX.cfg.settings, total = r.cost || 1;
-  const short = cxStock(q), noPrice = cxPlate().lines.filter(l => { const f = cxFil(l.fil); return f && f.price_kg == null; });
+  const short = cxStock(q), noPrice = cxCalcPlates().flatMap(p => p.lines).filter(l => { const f = cxFil(l.fil); return f && f.price_kg == null; });
   const tiers = [1, 5, 10, 25, 50].map(n => ({ n, u: cxCalc(n).unit })), base = tiers[0].u;
   $("#cxResult").innerHTML = `
     <div class="cx-lbl">Stückpreis · ${esc(R.name)}</div>
@@ -129,6 +147,7 @@ function cxRenderResult() {
       <div class="cx-side">Gesamt ${q} Stk<strong>${cxMoney(r.total)}</strong></div></div>
     <div class="cx-chips">
       <span class="pill">${st.klein ? "ohne USt (§ 19)" : `inkl. ${st.vat} % MwSt`}</span>
+      ${CX.job.plates.length > 1 ? `<span class="pill">${cxScope() === "all" ? `komplett (${CX.job.plates.length} Platten je Stück)` : `nur Platte ${cxPlate().n}`}</span>` : ""}
       <span class="pill">${r.plates} ${r.plates === 1 ? "Platte" : "Platten"} · ${cxNum(r.h, 1)} h</span>
       <span class="pill">${cxNum(r.grams, 0)} g Filament</span>
       ${short.length ? short.map(s => `<span class="pill warn">Bestand knapp: ${esc(s.f.name)} (${cxNum(s.g, 0)} von ${s.f.stock_g} g)</span>`).join("") : `<span class="pill ok">Bestand reicht</span>`}
@@ -155,10 +174,10 @@ function cxRenderResult() {
 const CX_DEF_LOGO = `<div class="cx-qbrand"><svg width="40" height="40" viewBox="0 0 64 64" aria-hidden="true"><use href="#psLogo"/></svg>
   <div><b>POWERSCRIPTING</b><small>Elevate. Automate. Innovate.</small></div></div>`;
 function cxQuoteModel(r, q) {
-  const sd = CX.cfg.sender, st = CX.cfg.settings, p = cxPlate();
+  const sd = CX.cfg.sender, st = CX.cfg.settings, lines = cxCalcPlates().flatMap(x => x.lines);
   const title = cxVal("#cqTitle") || CX.job.title || "3D-Druck", no = cxVal("#cqNo") || "–";
   const cust = [cxVal("#cqCust"), cxVal("#cqContact") ? "z. Hd. " + cxVal("#cqContact") : "", cxVal("#cqStreet"), [cxVal("#cqZip"), cxVal("#cqCity")].filter(Boolean).join(" ")].filter(Boolean);
-  const mats = [...new Set(p.lines.map(l => (cxFil(l.fil) || {}).name).filter(Boolean))].join(", ");
+  const mats = [...new Set(lines.map(l => (cxFil(l.fil) || {}).name).filter(Boolean))].join(", ");
   const date = new Date().toLocaleDateString("de-DE"), valid = new Date(Date.now() + (st.valid || 14) * 864e5).toLocaleDateString("de-DE");
   const sendLine = [sd.company || sd.name, sd.street, [sd.zip, sd.city].filter(Boolean).join(" ")].filter(Boolean).join(" · ");
   const cols = [[sd.name, sd.company !== sd.name ? sd.company : "", sd.street, [sd.zip, sd.city].filter(Boolean).join(" ")].filter(Boolean),
@@ -242,7 +261,7 @@ function cxPlatesFrom(list) {
 }
 function cxUseJob(plates, file, meta, source, title) {
   const keep = CX.job || cxNewJob();
-  CX.job = { ...keep, file, meta, source, title: title || "", plates, plate: 0 };
+  CX.job = { ...keep, file, meta, source, title: title || "", plates, plate: 0, scope: "all" };
   if (title) { $("#cqTitle").value = title; store.set("cqTitle", title); }
   cxSaveJob(); setTab("calc"); cxSetSub("calc");
 }
@@ -389,7 +408,10 @@ cxTab.addEventListener("input", e => {
   }
   else if (el.id && el.id.startsWith("cq")) { store.set(el.id, el.value); }
   else return;
-  if (el.id === "cxH") { const b = $(`#cxPlates [data-plate="${j.plate}"]`); if (b) b.textContent = `Platte ${p.n} · ${cxNum(p.hours)} h`; }
+  if (el.id === "cxH") {
+    const b = $(`#cxPlates [data-plate="${j.plate}"]`); if (b) b.textContent = `Platte ${p.n} · ${cxNum(p.hours)} h`;
+    const a = $("#cxPlates [data-scope=all]"); if (a) a.textContent = `Komplett · ${j.plates.length} Platten · ${cxNum(j.plates.reduce((s, x) => s + (+x.hours || 0), 0))} h`;
+  }
   cxSaveJob(); cxRenderResult();
 });
 cxTab.addEventListener("change", e => {
@@ -415,6 +437,7 @@ cxTab.addEventListener("click", e => {
   const j = CX.job, c = CX.cfg;
   if (b.dataset.cx) return cxSetSub(b.dataset.cx);
   if (b.dataset.plate !== undefined) { j.plate = +b.dataset.plate; cxSaveJob(); return cxRenderCalc(); }
+  if (b.dataset.scope) { j.scope = b.dataset.scope; cxSaveJob(); return cxRenderCalc(); }
   if (b.dataset.ldel !== undefined) { cxPlate().lines.splice(+b.dataset.ldel, 1); }
   else if (b.dataset.xdel !== undefined) { j.extras.splice(+b.dataset.xdel, 1); }
   else if (b.id === "cxAddLine") { const p = cxPlate(); p.lines.push({ slot: "#" + (p.lines.length + 1), grams: 20, fil: CX.fils[0] ? CX.fils[0].id : null, manual: true }); }
