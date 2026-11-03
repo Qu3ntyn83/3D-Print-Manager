@@ -41,16 +41,12 @@
       <p class="sub" id="stats">lädt …</p>
     </div>
   </div>
-  <nav class="tabs" role="tablist">
-    <button role="tab" data-tab="overview"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><span class="lbl">Übersicht</span></button>
-    <button role="tab" data-tab="stats"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-7"/></svg></span><span class="lbl">Statistik</span></button>
-    <button role="tab" data-tab="printer"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M12 7v6M9 13h6M7 17h10"/></svg></span><span class="lbl">Drucker</span></button>
-    <button role="tab" data-tab="filaments" class="active"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6"/></svg></span><span class="lbl">Filament</span></button>
-    <button role="tab" data-tab="accessories"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.8 1.8 0 0 0 2.5 2.5l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.4 2.4-2.1-.4-.4-2.1z"/></svg></span><span class="lbl">Zubehör</span></button>
-    <button role="tab" data-tab="materials"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></span><span class="lbl">Material</span></button>
-    <button role="tab" data-tab="library"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8.5 4.9v9.8L12 21.6l-8.5-4.9V6.9z"/><path d="M12 12l8.5-5M12 12v9.6M12 12L3.5 7"/></svg></span><span class="lbl">Bibliothek</span></button>
-    <button role="tab" data-tab="calc"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8.5 6.5h7M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01M8.5 18h.01M12 18h3.5"/></svg></span><span class="lbl">Kalkulation</span></button>
-    <button role="tab" data-tab="bambu"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 6v12M12 6v12M17 6v12"/></svg></span><span class="lbl"><span class="long">Bambu &amp; </span>AMS</span> <span class="dot" id="bambuDot"></span></button>
+  <nav class="tabs" role="tablist" aria-label="Hauptmenü">
+    <button role="tab" data-group="overview" data-tab="overview"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><span class="lbl">Übersicht</span></button>
+    <button role="tab" data-group="printer" data-tab="printer"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M12 7v6M9 13h6M7 17h10"/></svg></span><span class="lbl">Drucker</span> <span class="dot" id="bambuDot"></span></button>
+    <button role="tab" data-group="filaments" data-tab="filaments"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6"/></svg></span><span class="lbl">Filament</span></button>
+    <button role="tab" data-group="stock" data-tab="accessories"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M10 13h4"/></svg></span><span class="lbl">Lager</span></button>
+    <button role="tab" data-group="projects" data-tab="library"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8.5 4.9v9.8L12 21.6l-8.5-4.9V6.9z"/><path d="M12 12l8.5-5M12 12v9.6M12 12L3.5 7"/></svg></span><span class="lbl">Projekte</span></button>
 </nav>
   <button class="pstat" id="pstat" hidden title="Druckerstatus"></button>
   <div class="top-actions">
@@ -77,6 +73,12 @@
 </header>
 
 <main>
+  <div class="groupnav" id="groupNav">
+    <div class="seg" role="tablist" data-g="overview"><button data-go="overview">Übersicht</button><button data-go="stats">Statistik</button></div>
+    <div class="seg" role="tablist" data-g="printer"><button data-go="printer">Status</button><button data-go="bambu:ams">AMS</button><button data-go="bambu:tags">RFID <b id="tagsOpen"></b></button><button data-go="bambu:cloud">Cloud</button><button data-go="bambu:setup">Einrichten</button></div>
+    <div class="seg" role="tablist" data-g="stock"><button data-go="accessories">Zubehör</button><button data-go="materials">Material</button></div>
+    <div class="seg" role="tablist" data-g="projects"><button data-go="library">Bibliothek</button><button data-go="calc">Kalkulation</button></div>
+  </div>
   <!-- FILAMENT -->
   <section id="tab-filaments" class="tab">
     <div class="toolbar">
@@ -175,9 +177,9 @@
 
   <!-- BAMBU -->
   <section id="tab-bambu" class="tab" hidden>
-    <div class="subnav seg" role="tablist">
+    <div class="subnav seg bambu-sub" role="tablist">
       <button data-sub="ams" class="active">AMS live</button>
-      <button data-sub="tags">RFID-Tags <b id="tagsOpen"></b></button>
+      <button data-sub="tags">RFID-Tags</button>
       <button data-sub="cloud">Cloud-Bibliothek</button>
       <button data-sub="setup">Drucker &amp; Konto</button>
     </div>
@@ -208,7 +210,7 @@
           <tbody id="tBody"></tbody>
         </table>
       </div>
-      <p class="empty" id="tEmpty" hidden>Noch keine Tags gesehen – Drucker unter „Drucker &amp; Konto“ einrichten, Spule ins AMS legen.</p>
+      <p class="empty" id="tEmpty" hidden>Noch keine Tags gesehen – Drucker unter „Drucker → Einrichten“ verbinden, Spule ins AMS legen.</p>
     </div>
 
     <!-- Cloud -->

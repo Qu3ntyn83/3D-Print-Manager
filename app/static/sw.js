@@ -1,5 +1,5 @@
 // 3D Print Manager – Service Worker: App-Shell offline, API immer live
-const CACHE = "3dm-shell-v18";
+const CACHE = "3dm-shell-v19";
 const SHELL = ["/", "/static/style.css", "/static/app.js", "/static/extras.js", "/static/stats.js", "/static/library.js", "/static/calc.js", "/static/icons/favicon.svg", "/static/vendor/qrcode.js", "/static/icons/icon-192.png", "/manifest.webmanifest"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {

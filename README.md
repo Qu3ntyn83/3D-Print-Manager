@@ -6,12 +6,24 @@ Selbst gehostete Web-App für den 3D-Druck im Homelab: **Filament-, Material- un
 
 ## Funktionen
 
+**Menü** – fünf Bereiche (auf dem Handy unten), die Unterseiten stehen jeweils in der Leiste darunter:
+
+| Bereich | Unterseiten |
+|---|---|
+| Übersicht | Übersicht · Statistik |
+| Drucker | Status · AMS · RFID · Cloud · Einrichten |
+| Filament | – |
+| Lager | Zubehör · Material |
+| Projekte | Bibliothek · Kalkulation |
+
+Jeder Bereich merkt sich die zuletzt offene Unterseite; erneutes Tippen auf den Bereich führt zur ersten.
+
 **Inventar**
 - Filament mit **Farbmuster pro Spule** – offizielle Bambu-Farbwerte (über die 5-stellige Bambu-ID), Community-Farbwerte für Sunlu, Anycubic, Polymaker, eSun u. v. m., Verläufe, Transparenz, Matt/Silk/Galaxy-Optik, eigenes Foto vom gedruckten Muster
 - Kacheln, **sortierbare Tabelle** und **Inventur-Modus** (große Zeilen, „heute geprüft“, Fortschritt)
 - **Massenbearbeitung:** mehrere Filamente auswählen (oder „Alle angezeigten“ nach Suche/Filter) → Preis, Gewicht, Lagerort, Links, Druck-/Trocknungsprofil usw. in einem Schritt setzen
 - OVP / Spule / Refill / Muster, Lagerort, Mindestbestand („nachkaufen“), Restgewicht, Notizen
-- Reiter **Material** (Holz, Acryl, Vinyl …) und **Zubehör** (Düsen, Druckplatten, Magnete …)
+- Unter **Lager**: **Material** (Holz, Acryl, Vinyl …) und **Zubehör** (Düsen, Druckplatten, Magnete …)
 - Pro Eintrag **Hersteller**, **Hersteller-Link** und **Bezugsquelle (Shop-Link)** – 🛒 direkt in der Liste
 - Export als JSON-Backup und CSV (Excel), Import des Backups
 
@@ -29,7 +41,7 @@ Selbst gehostete Web-App für den 3D-Druck im Homelab: **Filament-, Material- un
 - **Wiegen** mit Tara (Leerspule wird je Sorte gemerkt)
 - **Kosten**: Preis je Spule/kg, Kosten je Druck (Material + Strom), Lagerwert
 - **Übersicht**: Einkaufsliste (Mindestbestand/fast leer, gruppiert nach Shop, „bestellt“-Markierung), Trocknungs-Hinweise (offene Liegezeit je Material, AMS-Feuchte), Verbrauch 12 Monate, nach Material, Top-Farben, „Reicht noch …“-Prognose
-- **Statistik** (eigener Reiter, Zeitraum frei wählbar, Vergleich zum Vorzeitraum): Verbrauch, Kosten (Material/Strom/Ausschuss), Erfolgsquote, Ø je Druck, teuerste/längste/abgebrochene Drucke, Kosten nach Material und Marke, Auslastung je Drucker, Heatmap Wochentag × Uhrzeit, Verbrauch je AMS-Slot, Lagerwert je Marke, Ladenhüter
+- **Statistik** (unter Übersicht, Zeitraum frei wählbar, Vergleich zum Vorzeitraum): Verbrauch, Kosten (Material/Strom/Ausschuss), Erfolgsquote, Ø je Druck, teuerste/längste/abgebrochene Drucke, Kosten nach Material und Marke, Auslastung je Drucker, Heatmap Wochentag × Uhrzeit, Verbrauch je AMS-Slot, Lagerwert je Marke, Ladenhüter
 - **Materialprofile**: Düsen-/Betttemperatur, Trocknung, max. offene Tage je Familie (PLA, PETG, ABS …) mit Überschreibung pro Sorte
 - **QR-Etiketten** (A4-Bögen 3×8 / 2×7, Etikettenrollen 62×29 / 50×30) und **Scanner** im Browser – Scan öffnet die Spule, Inventur per Scan
 - **Automatische Backups** (täglich, Aufbewahrung einstellbar, Download in den Einstellungen)
@@ -119,7 +131,7 @@ Neue Datenbankfelder werden beim Start automatisch angelegt; vorhandene Daten bl
 
 ## Drucker verbinden
 
-**Bambu & AMS → Drucker & Konto → + Drucker**
+**Drucker → Einrichten → + Drucker**
 
 | Modus | Benötigt | Hinweis |
 |---|---|---|
@@ -130,7 +142,7 @@ Die App hält pro Drucker eine MQTT-Verbindung, fordert alle 5 Minuten einen Vol
 
 ## Bambu-Account / Filament Manager
 
-**Bambu & AMS → Drucker & Konto**: E-Mail + Passwort (Bambu schickt meist einen Code per Mail), 2FA wird unterstützt. Konten, die über **Google/Apple** angelegt wurden, haben kein Passwort → **„Code per Mail“** verwenden. Alternativ ein vorhandenes Token einfügen.
+**Drucker → Einrichten**: E-Mail + Passwort (Bambu schickt meist einen Code per Mail), 2FA wird unterstützt. Konten, die über **Google/Apple** angelegt wurden, haben kein Passwort → **„Code per Mail“** verwenden. Alternativ ein vorhandenes Token einfügen.
 
 - Gespeichert wird nur das Token (ca. 90 Tage gültig), nicht das Passwort.
 - „Verbindung zur Bambu-Cloud testen“ prüft curl_cffi, DNS und HTTPS – bei `Could not resolve host` dem Container einen DNS-Server geben (siehe `dns:` in der `docker-compose.yml`) oder global in `/etc/docker/daemon.json`.

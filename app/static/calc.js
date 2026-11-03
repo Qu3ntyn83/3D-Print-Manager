@@ -204,7 +204,7 @@ function cxRenderCosts() {
     ${["price", "life", "watt", "wear"].map(k => `<td class="n"><input type="number" data-pk="${esc(p.key)}" data-k="${k}" value="${p[k]}" step="${k === "wear" ? 0.01 : 1}" min="0" class="cx-num"></td>`).join("")}
     <td class="n mono" data-ph="${esc(p.key)}">${cxMoney((+p.price || 0) / Math.max(1, +p.life || 1) + (+p.wear || 0))}</td>
     <td class="n">${p.source === "manual" ? `<button type="button" class="ghost mini" data-pdel="${esc(p.key)}" aria-label="${esc(p.name)} löschen">✕</button>` : ""}</td></tr>`).join("")
-    + (CX.printers.length === 1 && CX.printers[0].source === "default" ? `<tr><td colspan="7" class="muted small">Noch keine Drucker. Verbinde dein Bambu-Konto unter „Bambu & AMS“ oder lege unten einen Drucker an – bis dahin rechnet der Standarddrucker mit der Ø Leistung aus den Einstellungen.</td></tr>` : "");
+    + (CX.printers.length === 1 && CX.printers[0].source === "default" ? `<tr><td colspan="7" class="muted small">Noch keine Drucker. Verbinde dein Bambu-Konto unter „Drucker → Einrichten“ oder lege unten einen Drucker an – bis dahin rechnet der Standarddrucker mit der Ø Leistung aus den Einstellungen.</td></tr>` : "");
   $("#cxProfiles").innerHTML = CX.cfg.profiles.map((p, i) => `<tr><td>${esc(p.name)}</td>
     ${["margin", "rate", "risk"].map(k => `<td class="n"><input type="number" data-pr="${i}" data-k="${k}" value="${p[k]}" step="1" min="0" class="cx-num"></td>`).join("")}</tr>`).join("");
   const st = CX.cfg.settings;

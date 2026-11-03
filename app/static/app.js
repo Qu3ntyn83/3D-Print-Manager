@@ -468,8 +468,9 @@ function setSub(sub) {
   state.sub = sub; store.set("sub", sub);
   $$(".subnav button").forEach(b => b.classList.toggle("active", b.dataset.sub === sub));
   $$("#tab-bambu .subview").forEach(d => d.hidden = d.id !== "sub-" + sub);
+  if (state.tab === "bambu" && TAB_GROUP) markGroup();
 }
-$$(".subnav button").forEach(b => b.onclick = () => setSub(b.dataset.sub));
+$$(".subnav button[data-sub]").forEach(b => b.onclick = () => setSub(b.dataset.sub));
 setSub(state.sub);
 
 const filOpts = (sel, placeholder = "– Inventar-Spule wählen –") => {
@@ -484,7 +485,7 @@ function renderAms() {
   const el = $("#amsLive");
   if (!state.live.length) {
     el.innerHTML = `<div class="panel empty-panel"><h3>Noch kein Drucker eingerichtet</h3>
-      <p class="muted">Unter „Drucker &amp; Konto“ deinen H2S per LAN (IP + Zugangscode) oder über den Bambu-Account hinzufügen. Danach erscheinen hier die AMS-Slots live.</p>
+      <p class="muted">Unter „Drucker → Einrichten“ deinen H2S per LAN (IP + Zugangscode) oder über den Bambu-Account hinzufügen. Danach erscheinen hier die AMS-Slots live.</p>
       <button class="primary" onclick="setSub('setup')">Drucker einrichten</button></div>`;
     return;
   }
@@ -763,9 +764,26 @@ async function load() {
 }
 
 /* ---------- Tabs / Toolbar ---------- */
+/* Hauptmenü: 5 Bereiche, Unterseiten in der Leiste darunter. Ein Bereich merkt sich die zuletzt offene Unterseite. */
+var TAB_GROUP = { overview: "overview", stats: "overview", printer: "printer", bambu: "printer", filaments: "filaments",
+  accessories: "stock", materials: "stock", library: "projects", calc: "projects" };
+function goKey(t) { return t === "bambu" ? "bambu:" + (state.sub || "ams") : t; }
+function markGroup() {
+  const g = TAB_GROUP[state.tab] || state.tab, key = goKey(state.tab);
+  $$(".tabs button").forEach(b => b.classList.toggle("active", b.dataset.group === g));
+  $$("#groupNav [data-g]").forEach(d => { d.hidden = d.dataset.g !== g; });
+  $$("#groupNav [data-go]").forEach(b => b.classList.toggle("active", b.dataset.go === key));
+  store.set("g_" + g, key);
+}
+function go(key) {
+  const [t, sub] = key.split(":");
+  setTab(t);
+  if (sub) setSub(sub);
+}
 function setTab(t) {
+  if (!TAB_GROUP[t]) t = "overview";
   state.tab = t; store.set("tab", t);
-  $$(".tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === t));
+  markGroup();
   $$(".tab").forEach(s => s.hidden = s.id !== "tab-" + t);
   if (t === "bambu" && state.fil.length) { loadBambu().catch(() => {}); loadAms().catch(() => {}); }
   if (t === "overview" && typeof loadOverview === "function") loadOverview().catch(() => {});
@@ -774,7 +792,12 @@ function setTab(t) {
   if (t === "calc" && typeof loadCalc === "function") loadCalc().catch(e => toast("Kalkulation: " + e.message));
   if (t === "printer") { loadStatus().catch(() => {}); loadJobs().catch(() => {}); if (!state.live.length) loadAms().catch(() => {}); }
 }
-$$(".tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+$$(".tabs button").forEach(b => b.onclick = () => {
+  const g = b.dataset.group;
+  // erneuter Tipp auf den aktiven Bereich → zu seiner ersten Seite
+  go(TAB_GROUP[state.tab] === g ? b.dataset.tab : store.get("g_" + g, b.dataset.tab));
+});
+$$("#groupNav [data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
 $$("button[data-view]").forEach(b => {
   b.classList.toggle("active", b.dataset.view === state.view);
   b.onclick = () => { state.view = b.dataset.view; store.set("view", state.view); $$("button[data-view]").forEach(x => x.classList.toggle("active", x === b)); renderFil(); };
@@ -1033,7 +1056,7 @@ function renderPrinterTab() {
   const el = $("#prStatus"), list = state.pstatus || [];
   if (!list.length) {
     el.innerHTML = `<div class="panel empty-panel"><h3>Kein Drucker eingerichtet</h3>
-      <p class="muted">Unter „Bambu &amp; AMS → Drucker &amp; Konto“ den Drucker per LAN oder Bambu-Account verbinden.</p>
+      <p class="muted">Unter „Drucker → Einrichten“ den Drucker per LAN oder Bambu-Account verbinden.</p>
       <button class="primary" onclick="setTab('bambu'); setSub('setup')">Drucker einrichten</button></div>`;
     return;
   }
