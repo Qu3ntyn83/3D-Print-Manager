@@ -1,4 +1,4 @@
-"""3D Manager – kleine Homelab-Webapp (Flask + SQLite)."""
+"""3D Print Manager – kleine Homelab-Webapp (Flask + SQLite)."""
 import csv
 import io
 import json
@@ -506,6 +506,7 @@ import studio  # noqa: E402
 import stats  # noqa: E402
 import library  # noqa: E402
 import makerworld  # noqa: E402
+import calc  # noqa: E402
 from bambu import ensure_catalog  # noqa: E402
 
 app.register_blueprint(bambu_bp)
@@ -519,12 +520,14 @@ app.register_blueprint(studio.bp)
 app.register_blueprint(stats.bp)
 app.register_blueprint(library.bp)
 app.register_blueprint(makerworld.bp)
+app.register_blueprint(calc.bp)
 init_db()
 start_ams(app)
 units.init_schema()
 tasks.init_schema()
 studio.init_schema()
 library.init_schema()
+calc.init_schema()
 library.worker()
 makerworld.scheduler()
 ensure_catalog(app)

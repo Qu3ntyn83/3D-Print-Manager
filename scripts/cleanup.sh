@@ -33,8 +33,8 @@ count(){ find "$1" -type f 2>/dev/null | wc -l; }
 
 [ "$(id -u)" -eq 0 ] || die "Bitte mit sudo ausführen: sudo bash $0"
 command -v docker >/dev/null || die "docker fehlt"
-curl -fsS "$API/healthz" >/dev/null 2>&1 || die "3D Manager antwortet nicht auf $API – erst starten (cd $APP_DIR && sudo docker compose up -d)"
-ok "3D Manager läuft"
+curl -fsS "$API/healthz" >/dev/null 2>&1 || die "3D Print Manager antwortet nicht auf $API – erst starten (cd $APP_DIR && sudo docker compose up -d)"
+ok "3D Print Manager läuft"
 FREE_BEFORE=$(df -B1 --output=avail / | tail -1)
 
 # Wohin zeigen /library und /backups im laufenden Container?
@@ -87,13 +87,13 @@ fi
 for f in /root/3d-management-vor-umstieg-*.tar.gz; do
   [ -f "$f" ] || continue; found=1
   info "$f ($(size "$f")) – Archiv vom Umstieg"
-  ask "löschen? (nur wenn der 3D Manager seit dem Umstieg fehlerfrei läuft)" && { rm -f "$f"; ok "gelöscht"; }
+  ask "löschen? (nur wenn der 3D Print Manager seit dem Umstieg fehlerfrei läuft)" && { rm -f "$f"; ok "gelöscht"; }
 done
 [ "$found" = 1 ] || ok "nichts gefunden"
 
 # ------------------------------------------------------------------ 2. Bibliothek
 say "2/3 Bibliothek"
-REP="$(curl -fsS "$API/api/library/cleanup")" || die "Bibliotheksprüfung fehlgeschlagen – ist der 3D Manager aktuell (git pull)?"
+REP="$(curl -fsS "$API/api/library/cleanup")" || die "Bibliotheksprüfung fehlgeschlagen – ist der 3D Print Manager aktuell (git pull)?"
 python3 - "$REP" <<'PY'
 import json, sys
 r = json.loads(sys.argv[1]); c = r["counts"]
@@ -142,7 +142,7 @@ if [ -n "$OLD_IMG" ]; then
 fi
 USED="$(docker inspect -f '{{.Image}}' "$CONTAINER" 2>/dev/null | sed 's/^sha256://' | cut -c1-12)"
 STALE="$(docker images --no-trunc --format '{{.Repository}}:{{.Tag}} {{.ID}} {{.Size}}' \
-  | grep -E '3d-manager' | grep -v "sha256:$USED" || true)"
+  | grep -E '3d-(print-)?manager' | grep -v "sha256:$USED" || true)"
 if [ -n "$STALE" ]; then
   echo "$STALE" | sed 's/sha256:\(.\{12\}\)[0-9a-f]*/\1/' | sed 's/^/  · alte 3d-manager-Version: /'
   ask "entfernen?" && { echo "$STALE" | awk '{print $2}' | sort -u | xargs -r docker image rm -f >/dev/null 2>&1; ok "entfernt"; }

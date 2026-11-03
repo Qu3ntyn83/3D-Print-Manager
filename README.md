@@ -1,6 +1,6 @@
-# 3D Manager
+# 3D Print Manager
 
-Selbst gehostete Web-App für den 3D-Druck im Homelab: **Filament-, Material- und Zubehörbestand**, **Bambu Lab AMS live**, **RFID-Tags** (auch auf Fremdhersteller-Spulen) und **Druckerstatus** – in einem Docker-Container, optimiert für Desktop und Handy.
+Selbst gehostete Web-App für den 3D-Druck im Homelab: **Filament-, Material- und Zubehörbestand**, **Bambu Lab AMS live**, **RFID-Tags** (auch auf Fremdhersteller-Spulen), **Druckerstatus**, **Bibliothek** und **Kalkulation mit Angeboten** – in einem Docker-Container, optimiert für Desktop und Handy.
 
 ![Filament](docs/screenshots/filament.png)
 
@@ -22,7 +22,7 @@ Selbst gehostete Web-App für den 3D-Druck im Homelab: **Filament-, Material- un
 - **Druckerstatus**: Fortschritt, Schicht, Restzeit, Fertig-Uhrzeit, Temperaturen (Düse/Bett/Kammer), aktives Filament, Lüfter, HMS-Fehler im Klartext (deutsch)
 - **Grammgenauer Verbrauch** je Druck aus den Bambu-Cloud-Druckaufträgen (Slicer-Gramm pro AMS-Slot) – korrigiert die AMS-Schätzung, abgebrochene Drucke anteilig; Slots ohne Tag per Klick einer Spule zuordnen
 - **Druckhistorie** mit Verbrauch und Kosten je Druck
-- **Bambu Studio zeigt das richtige Fremdfilament:** Liegt eine Spule mit umgesetztem Bambu-Tag im AMS, meldet der 3D Manager dem Drucker das passende Profil (eigenes Cloud-Profil oder Systemprofil wie „SUNLU PLA+“), die Inventarfarbe und die Düsentemperatur. Ob der Drucker die Werte übernimmt, wird geprüft und am Slot angezeigt (✓ / ⚠)
+- **Bambu Studio zeigt das richtige Fremdfilament:** Liegt eine Spule mit umgesetztem Bambu-Tag im AMS, meldet der 3D Print Manager dem Drucker das passende Profil (eigenes Cloud-Profil oder Systemprofil wie „SUNLU PLA+“), die Inventarfarbe und die Düsentemperatur. Ob der Drucker die Werte übernimmt, wird geprüft und am Slot angezeigt (✓ / ⚠)
 
 **Spulen, Kosten & Planung**
 - **Einzelne Spulen** (S0001 …) statt nur Stückzahl: Status OVP/offen/leer und Spule/Refill **je Box** (die Sorte zeigt nur die Zusammenfassung), Restgewicht, Öffnungs- und Trocknungsdatum, Preis, Lagerort; RFID-Tag hängt an der konkreten Spule
@@ -33,6 +33,13 @@ Selbst gehostete Web-App für den 3D-Druck im Homelab: **Filament-, Material- un
 - **Materialprofile**: Düsen-/Betttemperatur, Trocknung, max. offene Tage je Familie (PLA, PETG, ABS …) mit Überschreibung pro Sorte
 - **QR-Etiketten** (A4-Bögen 3×8 / 2×7, Etikettenrollen 62×29 / 50×30) und **Scanner** im Browser – Scan öffnet die Spule, Inventur per Scan
 - **Automatische Backups** (täglich, Aufbewahrung einstellbar, Download in den Einstellungen)
+
+**Kalkulation & Angebote** (aus dem [3D Print Calculator](https://github.com/Qu3ntyn83/3D-Print-Calculator))
+- Druckkosten aus einer **3MF der Bibliothek** („Kalkulieren“ direkt am Modell), per Upload oder **ganz ohne 3MF** mit beliebig vielen Druckplatten
+- **Filamentpreise und Bestand aus dem Inventar**: Preis je kg aus den einzelnen Spulen, Warnung bei knappem Bestand oder fehlendem Preis; Filamente aus der 3MF werden nach Material und Farbe zugeordnet
+- **Drucker aus dem Bambu-Konto** automatisch, weitere Drucker manuell – je Drucker Kaufpreis, Lebensdauer, Ø Leistung und Verschleiß
+- Aufschlüsselung (Material, Strom, Maschine, Verschleiß, Arbeitszeit, Zubehör, Fehldruck-Risiko), **Mengenstaffel**, Preisprofile, Marge, MwSt oder Kleinunternehmer (§ 19 UStG), Rundung, 14 Währungen
+- **Angebote als PDF** mit eigenem Logo, Absender- und Bankdaten, Kundenadresse und fortlaufender Angebotsnummer
 
 **Bibliothek für Druckdateien**
 - **3MF und STL** ablegen (hochladen oder per Ziehen & Ablegen), mehrere Dateien je Modell
@@ -53,19 +60,22 @@ Selbst gehostete Web-App für den 3D-Druck im Homelab: **Filament-, Material- un
 ![Übersicht](docs/screenshots/uebersicht.png)
 ![Statistik](docs/screenshots/statistik.png)
 ![Bibliothek](docs/screenshots/bibliothek.png)
+![Kalkulation](docs/screenshots/kalkulation.png)
 
 ## Installation
 
 Voraussetzung: Docker mit Compose.
 
 ```bash
-git clone https://github.com/Qu3ntyn83/3D-Manager.git
-cd 3D-Manager
+git clone https://github.com/Qu3ntyn83/3D-Print-Manager.git
+cd 3D-Print-Manager
 docker compose pull      # fertiges Image von ghcr.io (amd64/arm64)
 docker compose up -d     # oder selbst bauen: docker compose up -d --build
 ```
 
 Danach erreichbar unter `http://<docker-host>:8095`.
+
+> **Früher „3D Manager“:** Das Projekt heißt jetzt 3D Print Manager. Das Image erscheint als `ghcr.io/qu3ntyn83/3d-print-manager`, das alte `ghcr.io/qu3ntyn83/3d-manager` wird übergangsweise weiter mit veröffentlicht. Dienst- und Containername bleiben `3d-manager`, damit bestehende Installationen, `docker-compose.override.yml` und die Skripte unverändert weiterlaufen. Ein `git pull` und `docker compose pull && docker compose up -d` genügen.
 
 - Daten liegen in `./data` (`inventar.db` + `uploads/` für Fotos).
 - **Bibliothek**: Druckdateien liegen in `./data/library` (eigener Ort per `LIBRARY_DIR`, z. B. NAS). Sie sind wegen der Größe **nicht** im täglichen Backup – den Ordner separat sichern. Max. Dateigröße `LIBRARY_MAX_MB` (Standard 500).
@@ -78,7 +88,7 @@ Danach erreichbar unter `http://<docker-host>:8095`.
 **Umstieg vom alten Paket „3D Management“** (Daten, Fotos, RFID-Zuordnungen und DNS-Einstellung werden übernommen, das alte Verzeichnis bleibt als Rückweg liegen):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Qu3ntyn83/3D-Manager/main/scripts/migrate-from-3d-management.sh -o migrate.sh
+curl -fsSL https://raw.githubusercontent.com/Qu3ntyn83/3D-Print-Manager/main/scripts/migrate-from-3d-management.sh -o migrate.sh
 sudo bash migrate.sh
 ```
 
@@ -141,7 +151,7 @@ Ein Tag ist nur eine ID. Was Bambu über den Tag meldet (Material/Farbe), wird n
 
 Handy-Browser können Bambu-Tags (MIFARE Classic) nicht lesen. Dafür gibt es die kleine **Android-App** (`android/`): Sie zeigt die normale Oberfläche und liest den Tag, sobald eine Spule ans Handy gehalten wird – auch wenn die App geschlossen ist.
 
-- **Download:** [3D-Manager.apk](https://github.com/Qu3ntyn83/3D-Manager/releases/download/android/3D-Manager.apk) (oder im Browser auf dem Handy unter ⋯ → „Android-App mit NFC laden“). Beim ersten Start die Adresse des 3D Manager eingeben, z. B. `http://192.168.178.42:8095`.
+- **Download:** [3D-Manager.apk](https://github.com/Qu3ntyn83/3D-Print-Manager/releases/download/android/3D-Manager.apk) (oder im Browser auf dem Handy unter ⋯ → „Android-App mit NFC laden“). Beim ersten Start die Adresse des 3D Print Manager eingeben, z. B. `http://192.168.178.42:8095`.
 - **Was gelesen wird:** immer die UID. Handys mit NXP-NFC-Chip (z. B. Pixel, viele Xiaomi/OnePlus) lesen zusätzlich die Bambu-Daten – Spulen-ID, Material, Farbe, Gewicht, Temperaturen, Produktionsdatum. Viele Samsung-Geräte unterstützen MIFARE Classic nicht; dort reicht die UID für die Zuordnung, Material/Farbe ergänzt das AMS.
 - **Ablauf:** Tag unbekannt → wird angelegt und lässt sich einer Inventar-Spule zuordnen. Tag bekannt → zeigt die Spule mit Restmenge, „Spule öffnen“. Bei offenem Scanner (⌗) mit „Inventur“ zählt der NFC-Scan wie ein QR-Code. Sieht das AMS den Tag später, werden beide Einträge automatisch zusammengeführt.
 - **Build:** GitHub Actions baut die APK bei Änderungen unter `android/` und legt sie im Release `android` ab. Für eine gleichbleibende Signatur (Updates ohne Neuinstallation) die Secrets `ANDROID_KEYSTORE_BASE64` und `ANDROID_KEYSTORE_PASSWORD` setzen.
@@ -206,6 +216,7 @@ app/
   library.py          Bibliothek: Modelle, Dateien, Tags, Sammlungen
   meshthumb.py        STL/3MF auswerten, Vorschaubilder rendern
   makerworld.py       MakerWorld-Sammlungen synchronisieren, 3MF laden
+  calc.py             Kalkulation & Angebote: Druckerkosten, Preisprofile, Angebotsdaten
   catalog_fetch.py    Bambu-Farbkatalog laden
   catalog/            Farbkataloge (Bambu, Community)
   hms/                HMS-Fehlertexte (de/en)
@@ -213,7 +224,7 @@ app/
 tests/                pytest (läuft in GitHub Actions)
 ```
 
-Tests lokal: `pip install -r requirements.txt pytest && python -m pytest -q tests`. GitHub Actions testet jeden Push/PR und baut bei `main` und Tags `v*` das Image `ghcr.io/qu3ntyn83/3d-manager`.
+Tests lokal: `pip install -r requirements.txt pytest && python -m pytest -q tests`. GitHub Actions testet jeden Push/PR und baut bei `main` und Tags `v*` das Image `ghcr.io/qu3ntyn83/3d-print-manager` (übergangsweise zusätzlich unter dem alten Namen `3d-manager`).
 
 ## Haftungsausschluss
 

@@ -1,7 +1,7 @@
 """MakerWorld: eigene Sammlungen in die Bibliothek spiegeln, Modelle mit Tags anlegen, 3MF laden.
 
 Alle Aufrufe gehen an api.bambulab.com (nicht an das Cloudflare-geschützte makerworld.com) und nutzen
-den Bambu-Token, mit dem der 3D Manager ohnehin angemeldet ist.
+den Bambu-Token, mit dem der 3D Print Manager ohnehin angemeldet ist.
 
   Sammlungen eines Nutzers   GET /v1/design-service/favoriteslist/{uid}?offset=&limit=
   Inhalt einer Sammlung      GET /v1/design-service/favorites/{collectionId}
@@ -31,7 +31,7 @@ from bambu import conn, get_setting, set_setting
 
 bp = Blueprint("makerworld", __name__, url_prefix="/api/makerworld")
 API = "https://api.bambulab.com"
-UA = "Mozilla/5.0 (3D-Manager; +https://github.com/Qu3ntyn83/3D-Manager)"
+UA = "Mozilla/5.0 (3D-Print-Manager; +https://github.com/Qu3ntyn83/3D-Print-Manager)"
 DEFAULTS = {"mw_auto_download": "1", "mw_import_tags": "1", "mw_download_limit": "25", "mw_sync_hours": "6"}
 DELAY_API, DELAY_DL = 0.6, 4.0
 _lock = threading.Lock()

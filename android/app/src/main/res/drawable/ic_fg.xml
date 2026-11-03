@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- #Powerscripting-Logo: Code-Klammern, Blitz und #PS (Text als Pfad) -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#EF7A33" android:pathData="M54,54 m-30,0 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0" />
-    <path android:fillColor="#D2611F" android:pathData="M54,54 m-26.5,0 a26.5,26.5 0 1,0 53.0,0 a26.5,26.5 0 1,0 -53.0,0" />
-    <path android:fillColor="#F08C48" android:pathData="M54,54 m-23.4,0 a23.4,23.4 0 1,0 46.8,0 a23.4,23.4 0 1,0 -46.8,0" />
-    <path android:fillColor="#D2611F" android:pathData="M54,54 m-20,0 a20,20 0 1,0 40,0 a20,20 0 1,0 -40,0" />
-    <path android:fillColor="#EF7A33" android:pathData="M54,54 m-16.8,0 a16.8,16.8 0 1,0 33.6,0 a16.8,16.8 0 1,0 -33.6,0" />
-    <path android:fillColor="#ECE8E0" android:pathData="M54,54 m-12.5,0 a12.5,12.5 0 1,0 25.0,0 a12.5,12.5 0 1,0 -25.0,0" />
-    <path android:fillColor="#141311" android:pathData="M54,54 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+    <group android:scaleX="1.15" android:scaleY="1.15" android:translateX="17.2" android:translateY="23.52">
+        <path android:strokeColor="#2FE29B" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:fillColor="#00000000" android:pathData="M15,20 L9,32 L15,44 M49,20 L55,32 L49,44" />
+        <path android:fillColor="#36A9FF" android:pathData="M37,9 L30,22 L35,22 L31,31 L41,17 L36,17 L39,9 Z" />
+        <path android:fillColor="#E5EEFC" android:pathData="M23.32 31.26 22.38 33.95H24.92L24.50 36.34H21.54L20.26 40.0H17.48L18.77 36.34H16.43L15.15 40.0H12.38L13.66 36.34H11.56L11.98 33.95H14.50L15.45 31.26H12.89L13.31 28.86H16.29L17.53 25.29H20.30L19.06 28.86H21.39L22.63 25.29H25.40L24.16 28.86H26.24L25.82 31.26ZM20.55 31.26H18.22L17.27 33.95H19.61Z M29.10 25.29H38.13L40.12 27.73L39.20 32.94L36.78 35.00H30.25L29.37 40.0H26.51ZM35.71 32.60 36.57 31.87 37.18 28.42 36.57 27.69H31.53L30.67 32.60Z M40.19 37.56 40.54 35.63H43.36L43.13 36.87L43.69 37.56H48.02L48.86 36.85L49.30 34.41L48.73 33.72H43.34L41.32 31.28L41.99 27.4L44.47 25.29H51.08L53.12 27.73L52.79 29.68H49.97L50.18 28.42L49.61 27.73H45.46L44.64 28.42L44.26 30.59L44.83 31.28H50.22L52.24 33.72L51.48 37.9L49.03 40.0H42.20Z" />
+    </group>
 </vector>

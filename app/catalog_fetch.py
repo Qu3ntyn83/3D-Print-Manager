@@ -31,7 +31,7 @@ def convert(raw: dict) -> list[dict]:
 
 
 def fetch(dest: Path, timeout: int = 30) -> int:
-    req = urllib.request.Request(URL, headers={"User-Agent": "3d-manager"})
+    req = urllib.request.Request(URL, headers={"User-Agent": "3d-print-manager"})
     with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 – feste HTTPS-URL
         data = convert(json.loads(r.read().decode("utf-8")))
     if len(data) < 50:
@@ -49,7 +49,7 @@ RAW = "https://raw.githubusercontent.com/bambulab/BambuStudio/master/resources/p
 
 def _get(url: str, timeout: int = 30):
     from urllib.parse import quote
-    req = urllib.request.Request(quote(url, safe=":/"), headers={"User-Agent": "3d-manager"})
+    req = urllib.request.Request(quote(url, safe=":/"), headers={"User-Agent": "3d-print-manager"})
     with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 – feste HTTPS-URL
         return json.loads(r.read().decode("utf-8"))
 

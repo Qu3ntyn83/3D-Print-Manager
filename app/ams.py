@@ -335,7 +335,7 @@ def update_tag(c, key, tr, pid, aid, tid, remain, ts, ours=False):
     vals = dict(tray_uuid=tr.get("tray_uuid"), tag_uid=tr.get("tag_uid"), tag_type=tr.get("tray_type"),
                 tag_idx=tr.get("tray_info_idx"), tag_color=(tr.get("tray_color") or "").upper(), tag_weight=tag_w,
                 last_seen=ts, printer_id=pid, ams_id=aid, tray_id=tid, in_ams=1)
-    if ours and old:  # Drucker meldet die vom 3D Manager gesetzten Werte → Tag-Angaben behalten
+    if ours and old:  # Drucker meldet die vom 3D Print Manager gesetzten Werte → Tag-Angaben behalten
         for k in ("tag_type", "tag_idx", "tag_color"):
             vals.pop(k)
     if remain is not None and remain >= 0:

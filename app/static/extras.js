@@ -1,5 +1,5 @@
 "use strict";
-/* 3D Manager – Erweiterungen: Spulen, Profile, Kosten, Übersicht, Etiketten, Scanner, Einstellungen.
+/* 3D Print Manager – Erweiterungen: Spulen, Profile, Kosten, Übersicht, Etiketten, Scanner, Einstellungen.
    Läuft nach app.js und nutzt dessen globale Helfer ($, $$, esc, api, state, swatchHTML, toast …). */
 
 state.settings = { currency: "€" };
@@ -429,7 +429,7 @@ $("#labelForm").onsubmit = e => {
     : `@page{size:A4;margin:0}.sheet{display:grid;grid-template-columns:repeat(${fmt.cols},${fmt.w}mm);grid-auto-rows:${fmt.h}mm;column-gap:${fmt.gx}mm;row-gap:${fmt.gy}mm;padding:${fmt.mt}mm 0 0 ${fmt.ml}mm}.lbl{width:${fmt.w}mm;height:${fmt.h}mm}.sheet>:nth-child(${fmt.cols * fmt.rows}n){page-break-after:always}`;
   const w = window.open("", "_blank");
   if (!w) return toast("Pop-up blockiert – bitte erlauben");
-  w.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Etiketten – 3D Manager</title><style>
+  w.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Etiketten – 3D Print Manager</title><style>
     *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#000;background:#fff}
     ${css}
     .lbl{display:flex;gap:2.2mm;align-items:center;padding:2mm 2.5mm;overflow:hidden}
@@ -504,7 +504,7 @@ async function handleScan(text) {
   }
 }
 
-/* ---------- Handy-NFC (Android-App „3D Manager“) ----------
+/* ---------- Handy-NFC (Android-App „3D Print Manager“) ----------
    Die App liest den Bambu-Tag und ruft window.on3dmNfc({uid, tray_uuid, type, detail, color, weight, …}) auf. */
 const inApp = typeof window.Android3DM !== "undefined";
 if (inApp) {
@@ -741,3 +741,4 @@ $("#studioRefresh").onclick = async () => {
   $("#studioCloudAt").textContent = `${st.presets.filter(p => p.source === "eigenes").length} eigene Profile, geladen ${fmtTime(st.cloud_at)}.`;
   toast(`${r.count} Profile aus der Bambu-Cloud geladen`);
 };
+if (state.tab === "overview") loadOverview().catch(() => {}); // Start direkt auf der Übersicht: app.js ruft setTab() auf, bevor diese Datei geladen ist

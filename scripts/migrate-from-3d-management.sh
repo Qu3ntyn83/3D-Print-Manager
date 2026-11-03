@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Umstieg vom alten Paket „3D Management“ auf den 3D Manager – mit Übernahme aller Daten.
+# Umstieg vom alten Paket „3D Management“ auf den 3D Print Manager – mit Übernahme aller Daten.
 #
-#   curl -fsSL https://raw.githubusercontent.com/Qu3ntyn83/3D-Manager/main/scripts/migrate-from-3d-management.sh -o migrate.sh
+#   curl -fsSL https://raw.githubusercontent.com/Qu3ntyn83/3D-Print-Manager/main/scripts/migrate-from-3d-management.sh -o migrate.sh
 #   sudo bash migrate.sh
 #
-# Ablauf: alten Container stoppen → Daten sichern → 3D Manager klonen → Daten kopieren → starten → prüfen.
+# Ablauf: alten Container stoppen → Daten sichern → 3D Print Manager klonen → Daten kopieren → starten → prüfen.
 # Das alte Verzeichnis bleibt unverändert liegen (Rückweg siehe Ende).
 #
 # Variablen (optional): OLD_DIR, NEW_DIR, BRANCH, REPO, PORT
@@ -12,7 +12,7 @@ set -euo pipefail
 
 OLD_DIR="${OLD_DIR:-/opt/3d-management}"
 NEW_DIR="${NEW_DIR:-/opt/3d-manager}"
-REPO="${REPO:-https://github.com/Qu3ntyn83/3D-Manager.git}"
+REPO="${REPO:-https://github.com/Qu3ntyn83/3D-Print-Manager.git}"
 BRANCH="${BRANCH:-main}"
 PORT="${PORT:-8095}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -42,7 +42,7 @@ say "Sichere alte Daten nach $BACKUP"
 tar -czf "$BACKUP" -C "$OLD_DIR" data
 ok "$(du -h "$BACKUP" | cut -f1)"
 
-say "Hole 3D Manager ($BRANCH) nach $NEW_DIR"
+say "Hole 3D Print Manager ($BRANCH) nach $NEW_DIR"
 if [ -d "$NEW_DIR/.git" ]; then
   git -C "$NEW_DIR" fetch --quiet origin "$BRANCH" && git -C "$NEW_DIR" checkout --quiet "$BRANCH" && git -C "$NEW_DIR" pull --quiet --ff-only
 else
@@ -66,7 +66,7 @@ if [ -n "$OVR" ]; then
   ok "docker-compose.override.yml angelegt (DNS: $(echo $DNS))"
 fi
 
-say "Starte 3D Manager"
+say "Starte 3D Print Manager"
 cd "$NEW_DIR"
 $DC up -d --build
 for i in $(seq 1 60); do

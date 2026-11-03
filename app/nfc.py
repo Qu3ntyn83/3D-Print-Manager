@@ -1,4 +1,4 @@
-"""NFC-Scan vom Handy (Android-App „3D Manager“): Bambu-Tag erkennen, anlegen und zuordnen.
+"""NFC-Scan vom Handy (Android-App „3D Print Manager“): Bambu-Tag erkennen, anlegen und zuordnen.
 
 Die App liest per Android-NFC immer die UID der Spule. Telefone mit NXP-NFC-Chip können zusätzlich
 die verschlüsselten MIFARE-Classic-Blöcke lesen (Schlüssel werden aus der UID abgeleitet) und

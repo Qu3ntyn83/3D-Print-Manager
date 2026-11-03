@@ -1,4 +1,4 @@
-"""Smoke- und Logiktests für 3D Manager (laufen ohne Netzwerk, Drucker und Bambu-Account)."""
+"""Smoke- und Logiktests für 3D Print Manager (laufen ohne Netzwerk, Drucker und Bambu-Account)."""
 import json
 import sqlite3
 
@@ -402,3 +402,40 @@ def test_pack_per_unit(client):
     # Massenbearbeitung: Refill für alle Boxen
     client.post("/api/filaments/bulk", json={"ids": [f["id"]], "set": {"refill": False}})
     assert not any(u["refill"] for u in client.get(f"/api/filaments/{f['id']}").json["units"] if u["status"] != "empty")
+
+
+def test_calc_data_and_config(client):
+    d = client.get("/api/calc/data").json
+    assert d["config"]["settings"]["cur"] == "EUR"
+    assert len(d["config"]["profiles"]) == 3
+    priced = [f for f in d["filaments"] if f["price_kg"]]
+    assert d["filaments"] and all(set(f) >= {"id", "name", "color", "stock_g"} for f in d["filaments"])
+    assert priced or all(f["price_kg"] is None for f in d["filaments"])
+    r = client.put("/api/calc/config", json={"manual_printers": [{"key": "m1", "name": "Prusa Core One", "price": 1200, "life": 5000,
+                                                                   "watt": 120, "wear": 0.15}],
+                                             "settings": {"vat": 19, "klein": False, "round": "none", "valid": 30, "cur": "CHF",
+                                                          "prefix": "Q-", "next_no": 7}}).json
+    assert r["ok"] and any(p["name"] == "Prusa Core One" for p in r["printers"])
+    d = client.get("/api/calc/data").json
+    assert d["config"]["settings"]["cur"] == "CHF" and d["config"]["settings"]["valid"] == 30
+    no = client.post("/api/calc/quote-no").json
+    assert no["no"].startswith("Q-") and no["no"].endswith("-0007") and no["next"] == 8
+    assert client.put("/api/calc/config", data="[]", content_type="application/json").status_code == 400
+
+
+def test_calc_filament_price_from_units(client):
+    f = client.post("/api/filaments", json={"brand": "Calc", "material": "PLA", "color_name": "Rot", "qty": 1,
+                                            "colors": ["#FF0000FF"], "net_weight_g": 1000, "price": 20}).json
+    row = next(x for x in client.get("/api/calc/data").json["filaments"] if x["id"] == f["id"])
+    assert row["price_kg"] == 20 and row["stock_g"] == 1000 and row["color"] == "#FF0000"
+
+
+def test_calc_default_printer_without_any(client, appmod):
+    import calc
+    from bambu import conn
+    with conn() as c:
+        cfg = calc._load(c)
+        cfg["manual_printers"] = []
+        calc._save(c, cfg)
+        names = [p["name"] for p in calc._printers(c, cfg)]
+    assert names == ["Standarddrucker"] or "Standarddrucker" not in names

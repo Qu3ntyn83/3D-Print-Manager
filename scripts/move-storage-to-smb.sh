@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Druckdateien (Bibliothek) und Backups des 3D Manager auf eine SMB-Freigabe (NAS) umziehen.
+# Druckdateien (Bibliothek) und Backups des 3D Print Manager auf eine SMB-Freigabe (NAS) umziehen.
 #
 #   sudo bash scripts/move-storage-to-smb.sh
 #
@@ -97,7 +97,7 @@ t="$LIB/.schreibtest-$STAMP"
 setpriv --reuid="$APP_UID" --regid="$APP_UID" --clear-groups sh -c "touch '$t' && rm '$t'" || die "Kein Schreibrecht auf $LIB – Rechte auf der QNAP prüfen"
 ok "$LIB"; ok "$BAK"
 
-say "3D Manager anhalten"
+say "3D Print Manager anhalten"
 cd "$APP_DIR"
 $DC stop >/dev/null 2>&1 || true
 ok "gestoppt"
@@ -109,7 +109,7 @@ for pair in "library:$LIB" "backups:$BAK"; do
   if [ -d "$src" ] && [ -n "$(ls -A "$src" 2>/dev/null)" ]; then
     rsync -rt --info=stats1 "$src/" "$dst/" | grep -E "Number of regular files transferred|Total transferred file size" | sed 's/^/  /'
     a=$(find "$src" -type f | wc -l); b=$(find "$dst" -type f | wc -l)
-    [ "$b" -ge "$a" ] || die "Kopie unvollständig ($b von $a Dateien) – nichts verändert, 3D Manager mit '$DC start' wieder starten"
+    [ "$b" -ge "$a" ] || die "Kopie unvollständig ($b von $a Dateien) – nichts verändert, 3D Print Manager mit '$DC start' wieder starten"
     mv "$src" "$src.vor-nas-$STAMP"
     ok "${pair%%:*}: $a Dateien kopiert, Original → data/${pair%%:*}.vor-nas-$STAMP"
   else
@@ -121,7 +121,7 @@ say "docker-compose.override.yml"
 write_override "$APP_DIR/docker-compose.override.yml" "$LIB" "$BAK"
 ok "Bibliothek → /library, Backups → /backups"
 
-say "3D Manager starten"
+say "3D Print Manager starten"
 $DC up -d >/dev/null
 for i in $(seq 1 45); do curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 && break; sleep 2; [ "$i" -eq 45 ] && { $DC logs --tail 40; die "Start fehlgeschlagen"; }; done
 python3 - "$PORT" <<'PY' || true

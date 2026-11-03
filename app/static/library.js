@@ -207,6 +207,7 @@ function libRenderFiles() {
         <small class="muted">${libFileInfo(x)}</small></div>
       <div class="lib-facts">
         <button type="button" class="ghost mini" data-fact="view" title="3D-Vorschau">3D</button>
+        ${x.kind === "3mf" && x.seconds ? `<button type="button" class="ghost mini" data-fact="calc" title="Druckkosten und Angebot berechnen">Kalkulieren</button>` : ""}
         <a class="ghost mini btnlike" href="${esc(studioLink(x))}" title="In Bambu Studio öffnen (Bambu Studio muss installiert sein)">Studio</a>
         <a class="ghost mini btnlike" href="${esc(x.url)}" download title="Herunterladen">⤓</a>
         ${x.thumb ? `<button type="button" class="ghost mini" data-fact="cover" title="Als Titelbild verwenden">★</button>` : ""}
@@ -218,6 +219,7 @@ $("#libFileList").addEventListener("click", async e => {
   const b = e.target.closest("[data-fact]"); if (!b) return;
   const fid = +b.closest(".lib-file").dataset.fid, x = LIB.cur.file_list.find(f => f.id === fid);
   if (b.dataset.fact === "view") return libView(x);
+  if (b.dataset.fact === "calc" && typeof cxFromLibraryFile === "function") { $("#libDlg").close(); return cxFromLibraryFile(LIB.cur, x).catch(err => toast("Kalkulation: " + err.message)); }
   if (b.dataset.fact === "cover") {
     await libApi(`/api/library/models/${LIB.cur.id}`, { method: "PUT", body: JSON.stringify({ cover_file: fid }) });
     toast("Titelbild gesetzt"); return libOpen(LIB.cur.id);

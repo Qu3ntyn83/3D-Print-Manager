@@ -771,6 +771,7 @@ function setTab(t) {
   if (t === "overview" && typeof loadOverview === "function") loadOverview().catch(() => {});
   if (t === "library" && typeof libLoad === "function") libLoad().catch(e => toast("Bibliothek: " + e.message));
   if (t === "stats" && typeof loadStats === "function") loadStats().catch(e => toast("Statistik: " + e.message));
+  if (t === "calc" && typeof loadCalc === "function") loadCalc().catch(e => toast("Kalkulation: " + e.message));
   if (t === "printer") { loadStatus().catch(() => {}); loadJobs().catch(() => {}); if (!state.live.length) loadAms().catch(() => {}); }
 }
 $$(".tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));

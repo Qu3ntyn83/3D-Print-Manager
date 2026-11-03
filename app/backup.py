@@ -22,7 +22,7 @@ from bambu import DATA_DIR, DB_PATH, conn, get_setting, set_setting
 
 bp = Blueprint("backup", __name__, url_prefix="/api/backups")
 BACKUP_DIR = Path(os.environ.get("BACKUP_DIR", DATA_DIR / "backups"))
-NAME_RE = re.compile(r"^3d-manager-\d{8}-\d{6}\.tar\.gz$")
+NAME_RE = re.compile(r"^3d-(?:print-)?manager-\d{8}-\d{6}\.tar\.gz$")
 _lock = threading.Lock()
 
 
@@ -30,7 +30,7 @@ def run_backup(reason="manuell") -> dict:
     with _lock:
         BACKUP_DIR.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        name = f"3d-manager-{stamp}.tar.gz"
+        name = f"3d-print-manager-{stamp}.tar.gz"
         with tempfile.TemporaryDirectory() as tmp:
             snap = Path(tmp) / "inventar.db"
             src = sqlite3.connect(DB_PATH)
@@ -55,7 +55,7 @@ def prune():
     from insights import setting
     with conn() as c:
         keep = setting(c, "backup_keep_days")
-    files = sorted(BACKUP_DIR.glob("3d-manager-*.tar.gz"))
+    files = sorted([*BACKUP_DIR.glob("3d-manager-*.tar.gz"), *BACKUP_DIR.glob("3d-print-manager-*.tar.gz")], key=lambda f: f.name[-22:])
     cutoff = datetime.now() - timedelta(days=max(1, keep))
     for f in files[:-3]:  # die letzten 3 bleiben immer
         if datetime.fromtimestamp(f.stat().st_mtime) < cutoff:
@@ -87,7 +87,7 @@ def scheduler():
 @bp.get("")
 def list_backups():
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    files = sorted(BACKUP_DIR.glob("3d-manager-*.tar.gz"), reverse=True)
+    files = sorted([*BACKUP_DIR.glob("3d-manager-*.tar.gz"), *BACKUP_DIR.glob("3d-print-manager-*.tar.gz")], key=lambda f: f.name[-22:], reverse=True)
     with conn() as c:
         last = get_setting(c, "backup_last")
     return jsonify({"dir": str(BACKUP_DIR), "last": last,

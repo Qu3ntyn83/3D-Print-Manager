@@ -53,6 +53,6 @@ jobs:
           name: Android-App (NFC)
           make_latest: false
           body: |
-            3D Manager als Android-App mit NFC-Leser für Bambu-RFID-Tags.
+            3D Print Manager als Android-App mit NFC-Leser für Bambu-RFID-Tags.
             Version 1.${{ github.run_number }} · Auf dem Handy herunterladen und installieren (Installation aus unbekannten Quellen erlauben).
           files: 3D-Manager.apk

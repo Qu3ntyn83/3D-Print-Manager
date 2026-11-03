@@ -1,4 +1,7 @@
 FROM python:3.12-slim
+LABEL org.opencontainers.image.title="3D Print Manager" \
+      org.opencontainers.image.description="Filament, AMS, Druckerstatus, Bibliothek und Kalkulation für den 3D-Druck" \
+      org.opencontainers.image.source="https://github.com/Qu3ntyn83/3D-Print-Manager"
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 DATA_DIR=/data
 WORKDIR /app
 COPY requirements.txt .

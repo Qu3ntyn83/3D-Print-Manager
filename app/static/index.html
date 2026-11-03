@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f4f2ee" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f5fa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a1325" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/static/icons/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="3D Manager">
-<title>3D Manager</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23e8742e'/><circle cx='16' cy='16' r='5' fill='%23111'/></svg>">
+<meta name="apple-mobile-web-app-title" content="3D Print Manager">
+<title>3D Print Manager</title>
+<link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml">
 <script>
   // Theme vor dem ersten Zeichnen setzen (kein Aufblitzen). Standard: dunkel.
   (function () { var t = "dark"; try { t = localStorage.getItem("finv.theme") || "dark"; t = JSON.parse(t); } catch (e) {}
@@ -23,9 +23,21 @@
 <body>
 <header class="top">
   <div class="brand">
-    <span class="spool" aria-hidden="true"></span>
+    <svg class="ps-logo" viewBox="0 0 64 64" role="img" aria-label="#Powerscripting">
+      <defs>
+        <linearGradient id="psGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2fe29b"/><stop offset="1" stop-color="#36a9ff"/></linearGradient>
+        <symbol id="psLogo" viewBox="0 0 64 64">
+          <rect x="2" y="2" width="60" height="60" rx="14" fill="#0b1630" stroke="url(#psGrad)" stroke-width="3"/>
+          <path d="M15 20 L9 32 L15 44M49 20 L55 32 L49 44" fill="none" stroke="url(#psGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="32" y="40" text-anchor="middle" font-family="Chakra Petch, sans-serif" font-style="italic" font-weight="700" font-size="21" fill="#e5eefc">#PS</text>
+          <path d="M37 9 L30 22 L35 22 L31 31 L41 17 L36 17 L39 9 Z" fill="url(#psGrad)"/>
+        </symbol>
+      </defs>
+      <use href="#psLogo"/>
+    </svg>
     <div>
-      <h1>3D Manager</h1>
+      <span class="kicker">#Powerscripting</span>
+      <h1>3D Print <b>Manager</b></h1>
       <p class="sub" id="stats">lädt …</p>
     </div>
   </div>
@@ -37,6 +49,7 @@
     <button role="tab" data-tab="accessories"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.8 1.8 0 0 0 2.5 2.5l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.4 2.4-2.1-.4-.4-2.1z"/></svg></span><span class="lbl">Zubehör</span></button>
     <button role="tab" data-tab="materials"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></span><span class="lbl">Material</span></button>
     <button role="tab" data-tab="library"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8.5 4.9v9.8L12 21.6l-8.5-4.9V6.9z"/><path d="M12 12l8.5-5M12 12v9.6M12 12L3.5 7"/></svg></span><span class="lbl">Bibliothek</span></button>
+    <button role="tab" data-tab="calc"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8.5 6.5h7M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01M8.5 18h.01M12 18h3.5"/></svg></span><span class="lbl">Kalkulation</span></button>
     <button role="tab" data-tab="bambu"><span class="icw"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 6v12M12 6v12M17 6v12"/></svg></span><span class="lbl"><span class="long">Bambu &amp; </span>AMS</span> <span class="dot" id="bambuDot"></span></button>
 </nav>
   <button class="pstat" id="pstat" hidden title="Druckerstatus"></button>
@@ -57,7 +70,7 @@
         <a href="#" id="menuLabels">Etiketten drucken …</a>
         <a href="#" id="menuSettings">Einstellungen …</a>
         <a href="#" id="menuApp" hidden>App: Server-Adresse …</a>
-        <a href="https://github.com/Qu3ntyn83/3D-Manager/releases/download/android/3D-Manager.apk" id="menuApk" hidden>Android-App mit NFC laden</a>
+        <a href="https://github.com/Qu3ntyn83/3D-Print-Manager/releases/download/android/3D-Manager.apk" id="menuApk" hidden>Android-App mit NFC laden</a>
       </div>
     </details>
   </div>
@@ -264,6 +277,141 @@
     <div class="lib-drop" id="libDrop" hidden><div>Dateien hier ablegen<br><small>3MF und STL</small></div></div>
   </section>
 
+  <section id="tab-calc" class="tab" hidden>
+    <div class="subnav seg" role="tablist" id="cxNav">
+      <button data-cx="calc" class="active">Kalkulation</button>
+      <button data-cx="quote">Angebot</button>
+      <button data-cx="costs">Drucker &amp; Profile</button>
+      <button data-cx="sender">Angebotsdaten</button>
+    </div>
+
+    <!-- Kalkulation -->
+    <div class="cx-view" id="cx-calc">
+      <div class="cx-grid">
+        <div class="cx-stack">
+          <div class="panel cx-source" id="cxDrop">
+            <svg class="cx-cube" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="m3 7 9 5 9-5M12 12v10"/></svg>
+            <div class="cx-src-txt"><b id="cxFile">Eigenes Projekt</b><span class="muted small" id="cxMeta">Werte eintragen oder eine 3MF laden</span></div>
+            <div class="cx-src-acts">
+              <label class="primary file-btn">3MF öffnen<input type="file" id="cx3mf" accept=".3mf" hidden></label>
+              <button id="cxFromLib">Aus Bibliothek</button>
+              <button class="ghost" id="cxNew">Ohne 3MF</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="cx-h"><h3>Druckplatte</h3><span class="muted small" id="cxPlateSrc">manuelle Eingabe</span></div>
+            <div class="cx-plates" id="cxPlates"></div>
+            <div class="cx-form">
+              <label>Druckzeit<span class="cx-unit"><input type="number" id="cxH" min="0" step="0.05"><em>h</em></span></label>
+              <label>Teile / Platte<input type="number" id="cxPpp" min="1" step="1"></label>
+              <label>Spülmaterial<span class="cx-unit"><input type="number" id="cxPurge" min="0" step="1"><em>g</em></span></label>
+              <label>Drucker<select id="cxPrinter"></select></label>
+            </div>
+            <div class="cx-tbl"><table class="cx-lines"><thead><tr><th>Slot</th><th>Filament aus dem Bestand</th><th class="n">Menge</th><th class="n">Kosten</th><th></th></tr></thead><tbody id="cxLines"></tbody></table></div>
+            <div class="cx-row"><button class="ghost" id="cxAddLine">+ Filament</button><button class="ghost" id="cxAddPlate">+ Druckplatte</button><button class="ghost" id="cxDelPlate"></button></div>
+          </div>
+
+          <div class="panel">
+            <div class="cx-h"><h3>Auftrag</h3></div>
+            <div class="cx-form">
+              <label>Menge<span class="cx-unit"><input type="number" id="cxQty" min="1" step="1"><em>Stk</em></span></label>
+              <label>Profil<select id="cxProfile"></select></label>
+              <label>Rüsten / Platte<span class="cx-unit"><input type="number" id="cxPrep" min="0" step="1"><em>min</em></span></label>
+              <label>Nacharbeit / Teil<span class="cx-unit"><input type="number" id="cxPost" min="0" step="0.5"><em>min</em></span></label>
+            </div>
+            <div class="cx-tbl"><table><thead><tr><th>Zubehör je Teil</th><th class="n">Stückpreis</th><th class="n">Anzahl</th><th></th></tr></thead><tbody id="cxExtras"></tbody></table></div>
+            <div class="cx-row"><button class="ghost" id="cxAddExtra">+ Zubehör</button></div>
+          </div>
+        </div>
+        <aside class="panel cx-result" id="cxResult" aria-live="polite"></aside>
+      </div>
+    </div>
+
+    <!-- Angebot -->
+    <div class="cx-view" id="cx-quote" hidden>
+      <div class="panel cx-narrow">
+        <div class="cx-h"><h3>Kunde &amp; Angebot</h3></div>
+        <div class="cx-form cx-form3">
+          <label>Name / Firma<input id="cqCust"></label>
+          <label>Ansprechpartner<input id="cqContact"></label>
+          <label>E-Mail<input id="cqMail" type="email"></label>
+          <label>Straße &amp; Nr.<input id="cqStreet"></label>
+          <label>PLZ<input id="cqZip"></label>
+          <label>Ort<input id="cqCity"></label>
+          <label>Bezeichnung<input id="cqTitle"></label>
+          <label>Angebotsnr.<span class="cx-inline"><input id="cqNo"><button type="button" class="ghost mini" id="cqNewNo" title="Nächste freie Nummer vergeben">Neu</button></span></label>
+          <div class="cx-acts"><button class="primary" id="cqPdf">PDF speichern</button><button id="cqCopy">Als Text kopieren</button></div>
+        </div>
+      </div>
+      <div class="cx-paper" id="cqPreview"></div>
+    </div>
+
+    <!-- Drucker & Profile -->
+    <div class="cx-view" id="cx-costs" hidden>
+      <div class="panel">
+        <div class="cx-h"><h3>Drucker</h3><span class="muted small">Drucker aus dem Bambu-Konto erscheinen automatisch. Die Ø Leistung lässt sich mit einem Strommessgerät an der Steckdose ermitteln.</span></div>
+        <div class="cx-tbl"><table><thead><tr><th>Drucker</th><th class="n">Kaufpreis</th><th class="n">Lebensdauer h</th><th class="n">Ø Leistung W</th><th class="n">Verschleiß /h</th><th class="n">Maschine /h</th><th></th></tr></thead><tbody id="cxPrinters"></tbody></table></div>
+        <form class="cx-form cx-add" id="cxAddPrinter">
+          <label>Weiterer Drucker<input id="npName" list="cxPrinterNames" placeholder="z. B. Prusa Core One" required></label>
+          <datalist id="cxPrinterNames"><option value="Bambu Lab X1 Carbon"><option value="Bambu Lab P1S"><option value="Bambu Lab P2S"><option value="Bambu Lab A1"><option value="Bambu Lab A1 mini"><option value="Bambu Lab H2D"><option value="Bambu Lab H2S"><option value="Bambu Lab H2C"><option value="Prusa MK4S"><option value="Prusa Core One"><option value="Creality K2 Plus"><option value="Elegoo Centauri Carbon"></datalist>
+          <label>Kaufpreis<input id="npPrice" type="number" min="0" step="1" value="899"></label>
+          <label>Lebensdauer h<input id="npLife" type="number" min="1" step="1" value="5000"></label>
+          <label>Ø Leistung W<input id="npWatt" type="number" min="0" step="5" value="150"></label>
+          <label>Verschleiß /h<input id="npWear" type="number" min="0" step="0.01" value="0.15"></label>
+          <div class="cx-acts"><button class="primary" type="submit">Hinzufügen</button></div>
+        </form>
+      </div>
+      <div class="panel">
+        <div class="cx-h"><h3>Preisprofile</h3></div>
+        <div class="cx-tbl"><table><thead><tr><th>Profil</th><th class="n">Marge %</th><th class="n">Stundensatz</th><th class="n">Fehldruck-Aufschlag %</th></tr></thead><tbody id="cxProfiles"></tbody></table></div>
+      </div>
+      <div class="panel">
+        <div class="cx-h"><h3>Preise &amp; Steuer</h3><span class="muted small">Strompreis und Filamentpreise gelten auch für die Statistik.</span></div>
+        <div class="cx-form">
+          <label>Strompreis je kWh<input id="csKwh" type="number" step="0.01" min="0"></label>
+          <label>Währung<select id="csCur"></select></label>
+          <label>MwSt %<input id="csVat" type="number" step="1" min="0"></label>
+          <label>Rundung Stückpreis<select id="csRound"></select></label>
+          <label class="inline cx-check"><input type="checkbox" id="csKlein"> Kleinunternehmer (§ 19 UStG)</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Angebotsdaten -->
+    <div class="cx-view" id="cx-sender" hidden>
+      <div class="panel">
+        <div class="cx-h"><h3>Logo für Angebote</h3><span class="muted small">PNG, JPG, SVG oder WebP, max. 500 KB</span></div>
+        <div class="cx-logo-row">
+          <div class="cx-logo" id="csLogoPrev"></div>
+          <span class="muted small" id="csLogoMeta"></span>
+          <label class="primary file-btn">Logo hochladen<input type="file" id="csLogo" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden></label>
+          <button class="ghost" id="csLogoDel">Standard verwenden</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="cx-h"><h3>Deine Daten</h3><span class="muted small">erscheinen in Absenderzeile und Fußzeile</span></div>
+        <div class="cx-form cx-form3" id="csSender"></div>
+      </div>
+      <div class="panel">
+        <div class="cx-h"><h3>Angebotsnummern</h3></div>
+        <div class="cx-form">
+          <label>Präfix<input id="csPrefix" placeholder="ANG-"></label>
+          <label>Nächste Nummer<input id="csNext" type="number" min="1" step="1"></label>
+          <label>Angebot gültig (Tage)<input id="csValid" type="number" min="1" step="1"></label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <dialog id="cxLibDlg" class="wide">
+    <form method="dialog" class="cx-libdlg">
+      <header class="dlg-head"><h2>Aus Bibliothek kalkulieren</h2><button type="button" class="x" data-close>✕</button></header>
+      <input type="search" id="cxLibQ" placeholder="Modell suchen …" autocomplete="off">
+      <div class="cx-liblist" id="cxLibList"><p class="muted">lädt …</p></div>
+    </form>
+  </dialog>
+
   <section id="tab-materials" class="tab" hidden>
     <div class="toolbar">
       <input type="search" id="mq" placeholder="Suchen: Holz, Magnet, Vinyl …" autocomplete="off">
@@ -384,7 +532,7 @@
 
     <fieldset id="studioBox">
       <legend>Bambu Studio</legend>
-      <p class="muted small">Liegt die Spule mit zugeordnetem RFID-Tag im AMS, schickt der 3D Manager dem Drucker dieses Profil mit Farbe und Düsentemperatur – Bambu Studio zeigt den Slot dann als dieses Filament statt als das, was im Tag steht.</p>
+      <p class="muted small">Liegt die Spule mit zugeordnetem RFID-Tag im AMS, schickt der 3D Print Manager dem Drucker dieses Profil mit Farbe und Düsentemperatur – Bambu Studio zeigt den Slot dann als dieses Filament statt als das, was im Tag steht.</p>
       <button type="button" class="pickbtn wide" id="studioPick"><span>Automatisch</span><i>🔍</i></button>
       <p class="muted small" id="studioHint"></p>
     </fieldset>
@@ -698,5 +846,6 @@
 <script src="/static/extras.js"></script>
 <script src="/static/stats.js"></script>
 <script src="/static/library.js"></script>
+<script src="/static/calc.js"></script>
 </body>
 </html>

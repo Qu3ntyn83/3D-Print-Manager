@@ -10,6 +10,8 @@ Diese Dateien stammen aus fremden Projekten und stehen unter deren eigener Lizen
 | `app/hms/hms_de.json.gz`, `app/hms/hms_en.json.gz` | HMS-/Fehlertexte aus [ha-bambulab](https://github.com/greghesp/ha-bambulab) | MIT (siehe `app/hms/LICENSE-ha-bambulab`) |
 | `app/static/vendor/qrcode.js` | [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) von Kazuhiko Arase | MIT |
 | `app/static/vendor/three/` (three.min.js, OrbitControls, STLLoader, 3MFLoader, fflate) | [three.js](https://github.com/mrdoob/three.js) r147 inkl. [fflate](https://github.com/101arrowz/fflate) | MIT (siehe `LICENSE-three`) |
+| `app/static/vendor/jspdf/jspdf.umd.min.js` | [jsPDF](https://github.com/parallax/jsPDF) 2.5.2 für Angebote als PDF | MIT (siehe `LICENSE-jspdf`) |
+| `app/static/fonts/` (Chakra Petch, IBM Plex Sans, JetBrains Mono) | Schriften der Oberfläche und der PDF-Angebote, über [Fontsource](https://fontsource.org) | SIL OFL 1.1 (siehe `app/static/fonts/OFL.txt`) |
 | `app/static/vendor/jsQR.js` | [jsQR](https://github.com/cozmo/jsQR) | Apache-2.0 (siehe `app/static/vendor/LICENSE-jsQR`) |
 
 Schlüsselableitung und Blockformat der Bambu-RFID-Tags (`android/…/BambuTag.java`) folgen dem [RFID-Tag-Guide der Bambu Research Group](https://github.com/Bambu-Research-Group/RFID-Tag-Guide).

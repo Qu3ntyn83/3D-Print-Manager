@@ -1,14 +1,14 @@
 {
-  "name": "3D Manager",
-  "short_name": "3D Manager",
-  "description": "Filament, Material, AMS und Druckerstatus",
+  "name": "3D Print Manager",
+  "short_name": "3D Print Manager",
+  "description": "Filament, Material, AMS, Druckerstatus und Kalkulation",
   "lang": "de",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#131210",
-  "theme_color": "#131210",
+  "background_color": "#0a1325",
+  "theme_color": "#0a1325",
   "icons": [
     { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
@@ -17,6 +17,7 @@
   "shortcuts": [
     { "name": "Drucker", "url": "/?tab=printer" },
     { "name": "AMS", "url": "/?tab=bambu" },
-    { "name": "Inventur", "url": "/?tab=filaments&view=check" }
+    { "name": "Inventur", "url": "/?tab=filaments&view=check" },
+    { "name": "Kalkulation", "url": "/?tab=calc" }
   ]
 }

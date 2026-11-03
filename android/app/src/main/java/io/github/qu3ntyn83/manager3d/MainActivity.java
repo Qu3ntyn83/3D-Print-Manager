@@ -33,7 +33,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 3D Manager als App: zeigt die Weboberfläche und liest Bambu-RFID-Tags per Handy-NFC.
+ * 3D Print Manager als App: zeigt die Weboberfläche und liest Bambu-RFID-Tags per Handy-NFC.
  * Ein gelesener Tag wird an die Seite übergeben: window.on3dmNfc({...}).
  */
 public class MainActivity extends Activity implements NfcAdapter.ReaderCallback {
@@ -196,7 +196,7 @@ public class MainActivity extends Activity implements NfcAdapter.ReaderCallback 
         box.setPadding(pad, pad / 2, pad, 0);
         box.addView(in);
         AlertDialog.Builder b = new AlertDialog.Builder(this)
-                .setTitle("Adresse des 3D Manager")
+                .setTitle("Adresse des 3D Print Manager")
                 .setMessage("Wie im Browser, z. B. http://192.168.178.42:8095")
                 .setView(box)
                 .setCancelable(!first)
@@ -251,7 +251,7 @@ public class MainActivity extends Activity implements NfcAdapter.ReaderCallback 
         public void onReceivedError(WebView view, WebResourceRequest req, WebResourceError err) {
             if (!req.isForMainFrame()) return;
             String html = "<html><body style='background:#141311;color:#ECE8E0;font-family:sans-serif;padding:32px'>"
-                    + "<h2>3D Manager nicht erreichbar</h2><p style='color:#a9a39a'>" + req.getUrl() + "<br>" + err.getDescription() + "</p>"
+                    + "<h2>3D Print Manager nicht erreichbar</h2><p style='color:#a9a39a'>" + req.getUrl() + "<br>" + err.getDescription() + "</p>"
                     + "<p>Bist du im Heimnetz (WLAN)?</p>"
                     + "<p><button style='font-size:17px;padding:12px 18px;margin-right:8px' onclick='location.href=\"" + serverUrl() + "/\"'>Erneut versuchen</button>"
                     + "<button style='font-size:17px;padding:12px 18px' onclick='Android3DM.changeServer()'>Adresse ändern</button></p></body></html>";

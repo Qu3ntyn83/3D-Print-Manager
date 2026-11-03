@@ -1,7 +1,8 @@
 services:
+  # Dienst- und Containername bleiben "3d-manager", damit bestehende Installationen und Skripte weiterlaufen
   3d-manager:
     # Fertiges Image (amd64/arm64) aus GitHub Actions – oder selbst bauen mit "build: ."
-    image: ghcr.io/qu3ntyn83/3d-manager:latest
+    image: ghcr.io/qu3ntyn83/3d-print-manager:latest
     build: .
     container_name: 3d-manager
     restart: unless-stopped
