@@ -262,21 +262,24 @@ $("#ovDry").addEventListener("click", async e => {
   await api(`/api/units/${e.target.closest("[data-uid]").dataset.uid}/dry`, { method: "POST", body: "{}" });
   toast("Trocknung vermerkt"); loadOverview(); refreshFilQuiet();
 });
-/* Charts: eine Reihe → Akzentfarbe, keine Legende; Werte als Tooltip */
+/* Charts: eine Reihe → Akzentfarbe, keine Legende; Werte als Tooltip.
+   Balken als SVG (darf sich in der Breite strecken), Beschriftung als HTML darüber – sonst wird die Schrift mitgezogen. */
 function barChart(rows, valueKey, labelFn, fmt) {
   const max = Math.max(1, ...rows.map(r => r[valueKey] || 0));
-  const W = 600, H = 180, pad = 22, bw = (W - pad) / rows.length;
+  const W = 600, H = 162, pad = 22, bw = (W - pad) / rows.length;
   const bars = rows.map((r, i) => {
-    const h = Math.round(((r[valueKey] || 0) / max) * (H - 30));
-    const x = pad + i * bw + 3, y = H - 18 - h;
+    const h = Math.round(((r[valueKey] || 0) / max) * (H - 12));
+    const x = pad + i * bw + 3, y = H - h;
     return `<g><title>${esc(labelFn(r, true))}: ${esc(fmt(r[valueKey] || 0))}</title>
-      <rect class="hit" x="${pad + i * bw}" y="0" width="${bw}" height="${H - 18}"/>
-      ${h ? `<path class="bar" d="M${x},${H - 18} V${y + 4} q0,-4 4,-4 h${bw - 14} q4,0 4,4 V${H - 18} Z"/>` : ""}
-      <text x="${x + (bw - 6) / 2}" y="${H - 4}" class="axl">${esc(labelFn(r))}</text></g>`;
+      <rect class="hit" x="${pad + i * bw}" y="0" width="${bw}" height="${H}"/>
+      ${h ? `<rect class="cbar" x="${x}" y="${y}" width="${Math.max(1, bw - 6)}" height="${h}"/>` : ""}</g>`;
   }).join("");
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" preserveAspectRatio="none">
-    <line x1="${pad}" x2="${W}" y1="${H - 18}" y2="${H - 18}" class="axis"/>
-    <text x="0" y="12" class="axl start">${esc(fmt(max))}</text>${bars}</svg>`;
+  const labels = rows.map(r => `<span>${esc(labelFn(r))}</span>`).join("");
+  return `<div class="chartbox" style="--pad:${(pad / W * 100).toFixed(3)}%">
+    <span class="axmax">${esc(fmt(max))}</span>
+    <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" preserveAspectRatio="none">
+      <line x1="${pad}" x2="${W}" y1="${H}" y2="${H}" class="axis" vector-effect="non-scaling-stroke"/>${bars}</svg>
+    <div class="axrow" style="grid-template-columns:repeat(${rows.length},minmax(0,1fr))">${labels}</div></div>`;
 }
 const MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 function renderMonths(st) {
