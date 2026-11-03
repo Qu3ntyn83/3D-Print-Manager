@@ -735,9 +735,12 @@ svg.chart .axl { fill: var(--muted); font-size: 11px; text-anchor: middle; }
 svg.chart .axl.start { text-anchor: start; }
 .tblview { margin-top: 6px; font-size: 12.5px; color: var(--muted); }
 .tblview summary { cursor: pointer; }
-.hbars { display: flex; flex-direction: column; gap: 7px; margin-top: 6px; }
-.hbar { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(60px, 2fr) auto; gap: 10px; align-items: center; font-size: 13px; }
-.hbar.fc { grid-template-columns: minmax(0, 1fr) auto auto; }
+/* Spalten gelten für die ganze Liste (subgrid) – Balken und Werte stehen sauber untereinander */
+.hbars { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(60px, 2fr) max-content; gap: 7px 10px; margin-top: 6px; }
+.hbars:has(> .fc) { grid-template-columns: minmax(0, 1fr) max-content max-content; }
+.hbar { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; font-size: 13px; }
+.hbar .hv { text-align: right; }
+.hbar.fc .pill { justify-self: end; }
 .hl { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hl .swatch { width: 16px; height: 16px; border-radius: 50%; flex: none; }
 .ht { height: 10px; background: var(--panel-2); border-radius: 0 4px 4px 0; overflow: hidden; }
@@ -778,10 +781,11 @@ svg.chart .axl.start { text-anchor: start; }
   .uacts button { min-height: 36px; padding: 4px 10px; }
   .kpis-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi b { font-size: 19px; }
-  .hbar { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+  .hbars, .hbars:has(> .fc) { grid-template-columns: minmax(0, 1fr) max-content; }
+  .hbar { row-gap: 4px; }
   .hbar .ht { grid-column: 1 / -1; grid-row: 2; }
-  .hbar.fc { grid-template-columns: minmax(0, 1fr) auto; }
-  .hbar.fc .hv { grid-column: 1; }
+  .hbar.fc .hv { grid-column: 1; grid-row: 2; text-align: left; }
+  .hbar.fc .pill { grid-column: 2; grid-row: 1 / span 2; }
   .proftbl input { width: 56px; font-size: 14px; }
   .theme-btn#scanBtn { font-size: 20px; }
 }
@@ -865,8 +869,11 @@ td .rflag { font-size: 10.5px; padding: 2px 7px 2px 5px; }
 .st-dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; margin: 0; flex: 1; min-width: 0; }
 .st-dl dt { font-size: 11.5px; color: var(--muted); } .st-dl dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 .st-dl dd.warn { color: var(--danger); }
-.st-jobs, .st-idle { display: flex; flex-direction: column; }
-.st-job, .st-iu { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.st-jobs, .st-idle { display: grid; column-gap: 10px; }
+.st-jobs { grid-template-columns: minmax(0, 1fr) max-content max-content; }
+.st-idle { grid-template-columns: max-content minmax(0, 1fr) max-content; }
+.st-job, .st-iu { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.st-job .pill { justify-self: center; }
 .st-job:last-child, .st-iu:last-child { border-bottom: 0; }
 .st-iu { background: none; border-left: 0; border-right: 0; border-top: 0; border-radius: 0; text-align: left; color: inherit; cursor: pointer; width: 100%; font: inherit; }
 .st-iu:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
