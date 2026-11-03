@@ -1,5 +1,7 @@
 # 3D Print Manager
 
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-unterst%C3%BCtzen-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/quentyn83)
+
 Selbst gehostete Web-App für den 3D-Druck im Homelab: **Filament-, Material- und Zubehörbestand**, **Bambu Lab AMS live**, **RFID-Tags** (auch auf Fremdhersteller-Spulen), **Druckerstatus**, **Bibliothek** und **Kalkulation mit Angeboten** – in einem Docker-Container, optimiert für Desktop und Handy.
 
 ![Filament](docs/screenshots/filament.png)
@@ -245,6 +247,12 @@ Die Bambu-Cloud-Schnittstelle ist inoffiziell (dieselbe, die Bambu Studio nutzt)
 ## Autor
 
 **[Qu3ntyn83](https://github.com/Qu3ntyn83)** – Idee, Anforderungen und Test im eigenen Homelab (Bambu Lab H2S mit AMS 2 Pro).
+
+## Unterstützen
+
+Wenn dir das Projekt hilft und du mir einen Kaffee ausgeben möchtest, freue ich mich sehr:
+
+<a href="https://buymeacoffee.com/quentyn83"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="45"></a>
 
 ## Lizenz
 
