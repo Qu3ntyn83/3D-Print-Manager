@@ -458,3 +458,41 @@ def test_rfid_link_to_unit(client):
     client.post(f"/api/ams/rfid/{a}/link", json={"filament_id": other["id"], "unit_id": u1})
     assert tag(a)["unit_id"] == other["units"][0]["id"]
     assert [u["tag"]["key"] for u in client.get(f"/api/filaments/{f['id']}").json["units"] if u["tag"]] == [b]
+
+
+def test_ams_moved_to_other_printer(client):
+    """AMS HT wird von Drucker 1 an Drucker 2 umgesteckt → verschwindet bei Drucker 1."""
+    import json as _j
+    from ams import PrinterConn
+    from ams import conn as dbconn
+    with dbconn() as c:
+        ids = []
+        for name, sn in (("D1", "0938A"), ("D2", "0938B")):
+            ids.append(c.execute("INSERT INTO printers (name, serial, mode) VALUES (?,?,'lan')", (name, sn)).lastrowid)
+    p1, p2 = (PrinterConn({"id": i, "serial": s, "mode": "lan"}) for i, s in zip(ids, ("0938A", "0938B")))
+    tr = lambda i, col, uid="0" * 16: {"id": str(i), "state": 11, "tray_type": "PLA", "tray_info_idx": "GFA00", "tray_color": col,  # noqa: E731
+                                       "remain": 50, "tag_uid": uid, "tray_uuid": uid * 2}
+    msg = lambda m, units, bits=None: type("M", (), {"payload": _j.dumps({"print": {"msg": m, "ams": {  # noqa: E731
+        **({"ams_exist_bits": bits} if bits else {}), "ams": units}}})})()
+    ams0 = {"id": "0", "tray": [tr(0, "FF0000FF")]}
+    ht = {"id": "128", "tray": [tr(0, "00FF00FF", "AABBCCDDEEFF0011")]}
+    p1._on_message(None, None, msg(0, [ams0, ht], "1"))
+    slots = lambda pid: {(r["ams_id"], r["tray_id"]) for r in client.get("/api/ams/live").json if r["id"] == pid for r in r["trays"]}  # noqa: E731
+    assert slots(ids[0]) == {(0, 0), (128, 0)}
+    # Delta ohne HT ändert nichts (Deltas enthalten nicht alle Einheiten)
+    p1._on_message(None, None, msg(1, [ams0]))
+    assert (128, 0) in slots(ids[0])
+    # Drucker 2 meldet den Tag schon, bevor Drucker 1 seinen Vollstatus schickt → Slot bei Drucker 1 leer
+    p2._on_message(None, None, msg(1, [ht]))
+    assert next(t for r in client.get("/api/ams/live").json if r["id"] == ids[0] for t in r["trays"] if t["ams_id"] == 128)["empty"] == 1
+    # Vollstatus ohne HT → weg bei Drucker 1, Tag nicht mehr im AMS
+    p1._on_message(None, None, msg(0, [ams0], "1"))
+    assert slots(ids[0]) == {(0, 0)}
+    p2._on_message(None, None, msg(0, [ht], "0"))
+    assert slots(ids[1]) == {(128, 0)}
+    with dbconn() as c:
+        t = c.execute("SELECT printer_id, in_ams, ams_id FROM tags WHERE upper(tag_uid)='AABBCCDDEEFF0011'").fetchone()
+    assert t["printer_id"] == ids[1] and t["in_ams"] == 1 and t["ams_id"] == 128
+    # ams_exist_bits: AMS 0 abgezogen
+    p1._on_message(None, None, msg(1, [], "0"))
+    assert slots(ids[0]) == set()

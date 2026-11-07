@@ -127,6 +127,8 @@ class PrinterConn:
         self.last_msg = None
         self.state: dict[tuple, dict] = {}   # (ams_id, tray_id) -> tray dict
         self.ams_info: dict[int, dict] = {}  # ams_id -> humidity/temp
+        self.units: set | None = None        # AMS-IDs laut letztem Vollstatus (None = noch unbekannt)
+        self._dropped: set = set()           # entfernte AMS-IDs, noch nicht aus der DB gelöscht
         self.model = None
         self.raw: dict = {}       # zusammengeführter Druckerstatus (print.*)
         self.tray_now = None
@@ -244,6 +246,13 @@ class PrinterConn:
             ams = (p.get("ams") or {})
             if "tray_now" in ams:
                 self.tray_now = ams["tray_now"]
+            gone = self._gone_units(p, ams)
+            for aid in gone:                  # AMS abgesteckt bzw. an einen anderen Drucker umgesteckt
+                for k in [k for k in self.state if k[0] == aid]:
+                    del self.state[k]
+                self.ams_info.pop(aid, None)
+                self._dropped.add(aid)
+                changed = True
             for unit in ams.get("ams") or []:
                 aid = _int(unit.get("id"), 0)
                 info = self.ams_info.setdefault(aid, {})
@@ -276,6 +285,30 @@ class PrinterConn:
             except Exception as e:  # noqa: BLE001
                 print("Job-Tracking:", e, flush=True)
 
+    def _gone_units(self, p: dict, ams: dict) -> set:
+        """AMS-Einheiten, die der Drucker nicht mehr meldet.
+
+        Vollstatus (``msg == 0``, Antwort auf pushall) enthält immer alle angeschlossenen Einheiten –
+        was dort fehlt, ist weg. Zusätzlich ``ams_exist_bits`` (Bitmaske für AMS 0–3)."""
+        known = {k[0] for k in self.state if k[0] != 255} | set(self.ams_info)
+        gone = set()
+        units = ams.get("ams")
+        if isinstance(units, list) and _int(p.get("msg"), 1) == 0:
+            present = {_int(u.get("id"), 0) for u in units if isinstance(u, dict)}
+            gone |= known - present
+            self.units = present
+        bits = ams.get("ams_exist_bits")
+        if bits not in (None, ""):
+            try:
+                mask = int(str(bits), 16)
+            except ValueError:
+                mask = None
+            if mask is not None:
+                gone |= {a for a in known if a < 4 and not mask >> a & 1}
+                if self.units is not None:
+                    self.units -= gone
+        return gone
+
     def status(self) -> dict | None:
         with self._lock:
             if not self.raw:
@@ -294,7 +327,18 @@ class PrinterConn:
         with self._lock:
             snapshot = {k: dict(v) for k, v in self.state.items()}
             info = {k: dict(v) for k, v in self.ams_info.items()}
+            units = set(self.units) if self.units is not None else None
+            dropped, self._dropped = self._dropped, set()
         with conn() as c:
+            for aid in dropped:
+                c.execute("DELETE FROM ams_trays WHERE printer_id=? AND ams_id=?", (self.id, aid))
+            if units is not None:
+                # Slots von AMS-Einheiten, die dieser Drucker nicht mehr hat, entfernen
+                q = "DELETE FROM ams_trays WHERE printer_id=? AND ams_id!=255"
+                cur = units | {k[0] for k in snapshot}
+                if cur:
+                    q += f" AND ams_id NOT IN ({','.join('?' * len(cur))})"
+                c.execute(q, (self.id, *cur))
             seen_keys = set()
             for (aid, tid), tr in snapshot.items():
                 key = tag_key(tr)
@@ -322,6 +366,11 @@ class PrinterConn:
                     seen_keys.add(key)
                     import studio
                     update_tag(c, key, tr, self.id, aid, tid, remain, ts, ours=studio.is_ours(c, self.id, aid, tid, tr))
+            # Eine Spule steckt nur in einem Drucker: meldet dieser Drucker einen Tag, verschwindet er
+            # beim anderen (AMS umgesteckt, der andere hat noch keinen neuen Vollstatus geschickt)
+            if seen_keys:
+                qk = ",".join("?" * len(seen_keys))
+                c.execute(f"UPDATE ams_trays SET tag_key=NULL, empty=1 WHERE printer_id!=? AND tag_key IN ({qk})", (self.id, *seen_keys))
             # Tags, die dieser Drucker vorher hatte und jetzt nicht mehr: aus dem AMS genommen
             q = "UPDATE tags SET in_ams=0 WHERE printer_id=? AND in_ams=1"
             if seen_keys:
