@@ -134,6 +134,9 @@ def analyze_now(fid: int):
     if png:
         thumb_path(fid).write_bytes(png)
     with conn() as c:
+        if not c.execute("SELECT 1 FROM lib_files WHERE id=?", (fid,)).fetchone():
+            thumb_path(fid).unlink(missing_ok=True)  # Datei wurde während der Analyse gelöscht → keine verwaiste Vorschau
+            return
         c.execute("UPDATE lib_files SET meta=?, has_thumb=? WHERE id=?", (json.dumps(meta, ensure_ascii=False), 1 if png else 0, fid))
         m = c.execute("SELECT * FROM lib_models WHERE id=?", (f["model_id"],)).fetchone()
         if m and not m["cover"] and png:

@@ -256,7 +256,8 @@ function cxMatch(type, color) {
 function cxPlatesFrom(list) {
   return list.filter(p => (p.seconds || 0) > 0 || (p.filaments || []).length).map((p, i) => ({
     n: p.index || i + 1, hours: +((p.seconds || 0) / 3600).toFixed(2), ppp: Math.max(1, p.objects || 1), purge: 0,
-    lines: (p.filaments || []).map((f, k) => ({ slot: "#" + (f.id || k + 1), type: f.type, color: (f.color || "#888888").slice(0, 7), grams: +(+f.g || 0).toFixed(2), fil: cxMatch(f.type, f.color) })),
+    lines: (p.filaments && p.filaments.some(f => +f.g > 0) ? p.filaments : (+p.grams > 0 ? [{ ...((p.filaments || [])[0] || { id: "1" }), g: +p.grams }] : p.filaments || []))
+      .map((f, k) => ({ slot: "#" + (f.id || k + 1), type: f.type, color: (f.color || "#888888").slice(0, 7), grams: +(+f.g || 0).toFixed(2), fil: cxMatch(f.type, f.color) })),
   }));
 }
 function cxUseJob(plates, file, meta, source, title) {
@@ -275,8 +276,11 @@ function cxSliceInfo(text) {
   return [...text.matchAll(/<plate>([\s\S]*?)<\/plate>/g)].map((m, i) => {
     const body = m[1], meta = {};
     for (const t of body.matchAll(/<metadata\b[^>]*>/g)) { const k = cxAttr(t[0], "key"); if (k) meta[k] = cxAttr(t[0], "value"); }
-    return { index: +(meta.index || i + 1), seconds: Math.round(+meta.prediction || 0), objects: (body.match(/<object\b/g) || []).length,
-      filaments: [...body.matchAll(/<filament\b[^>]*>/g)].map(t => ({ id: cxAttr(t[0], "id"), type: cxAttr(t[0], "type"), color: cxAttr(t[0], "color"), g: +cxAttr(t[0], "used_g") || 0 })) };
+    let fil = [...body.matchAll(/<filament\b[^>]*>/g)].map(t => ({ id: cxAttr(t[0], "id"), type: cxAttr(t[0], "type"), color: cxAttr(t[0], "color"),
+      g: +(cxAttr(t[0], "used_g") || cxAttr(t[0], "usedG")) || 0 }));
+    // keine Gramm je Filament, aber Gesamtgewicht der Platte → auf das erste Filament
+    if (!fil.some(f => f.g > 0) && +meta.weight > 0) fil = [{ ...(fil[0] || { id: "1", type: "", color: "#888888" }), g: +meta.weight }];
+    return { index: +(meta.index || i + 1), seconds: Math.round(+meta.prediction || 0), objects: (body.match(/<object\b/g) || []).length, filaments: fil };
   });
 }
 function cxGcodeHead(text, index, proj) {
@@ -311,6 +315,18 @@ async function cxRead3mf(buf) {
     if (fromG.some(p => p.seconds > 0)) list = fromG;
   }
   if (list.some(p => p.seconds > 0)) return { list: list.filter(p => p.seconds > 0 || p.filaments.length), sliced: true };
+  // MakerWorld-Datei? Dann stehen Zeit und Gramm im Druckprofil (Modell muss in der Bibliothek sein)
+  const head = fflate.unzipSync(u8, { filter: f => /^3D\/3dmodel\.model$/i.test(f.name) });
+  const mtxt = Object.values(head)[0] ? fflate.strFromU8(Object.values(head)[0].subarray(0, 200000)) : "";
+  const mdv = k => (mtxt.match(new RegExp(`<metadata name="${k}"[^>]*>([^<]*)<`)) || [])[1] || "";
+  const mwModel = mdv("DesignModelId"), mwProfile = mdv("DesignProfileId");
+  if (mwModel || mwProfile) {
+    try {
+      const r = await api(`/api/makerworld/plates-for-file?model_id=${encodeURIComponent(mwModel)}&profile_id=${encodeURIComponent(mwProfile)}`);
+      const mw = (r.plates || []).filter(p => p.seconds);
+      if (mw.length) return { list: mw, sliced: true, source: "makerworld" };
+    } catch { /* nicht in der Bibliothek → von Hand */ }
+  }
   // Projekt ohne Slicing: Platten aus model_settings.config, Filamente aus den Projekteinstellungen
   const ms = txt("Metadata/model_settings.config");
   const ids = ms ? [...ms.matchAll(/<plate>([\s\S]*?)<\/plate>/g)].map((m, i) => {
@@ -320,7 +336,7 @@ async function cxRead3mf(buf) {
   const fil = (proj.filament_type || []).map((t, k) => ({ id: String(k + 1), type: t, color: (proj.filament_colour || [])[k] || "#888888", g: 0 }));
   // welche Filamente eine Platte nutzt, steht erst nach dem Slicen fest → erstes Projektfilament als Vorschlag
   const plates = (ids.length ? ids : [{ index: 1, objects: 0 }]).map(p => ({ ...p, seconds: 0, filaments: fil.slice(0, 1) }));
-  return { list: plates, sliced: false, hasModel: !!ms || fil.length > 0 };
+  return { list: plates, sliced: false, hasModel: !!ms || fil.length > 0, mw: !!(mwModel || mwProfile) };
 }
 async function cxImportFile(file) {
   try {
@@ -330,9 +346,10 @@ async function cxImportFile(file) {
     const plates = r.sliced ? cxPlatesFrom(r.list) : cxPlatesFrom(r.list.map(p => ({ ...p, filaments: p.filaments.length ? p.filaments : [{ id: "1", type: "", color: "#888888", g: 0 }] })))
       .map(p => ({ ...p, lines: p.lines.map(l => ({ ...l, grams: l.grams || 0 })) }));
     const n = `${plates.length} ${plates.length === 1 ? "Druckplatte" : "Druckplatten"}`;
-    cxUseJob(plates, file.name, r.sliced ? `${n} · Filament automatisch zugeordnet, bitte prüfen`
-      : `${n} · nicht geslict – Druckzeit und Gramm je Platte eintragen (oder in Bambu Studio „Platte slicen“ und als .gcode.3mf exportieren)`, "upload", title);
-    toast(r.sliced ? "3MF importiert" : "Projekt ohne Slice-Daten übernommen – Zeit und Gramm bitte eintragen");
+    cxUseJob(plates, file.name, r.source === "makerworld" ? `${n} · Zeiten und Gramm aus dem MakerWorld-Druckprofil` : r.sliced ? `${n} · Filament automatisch zugeordnet, bitte prüfen`
+      : r.mw ? `${n} · MakerWorld-Datei ohne Slice-Daten – Modell in die Bibliothek übernehmen, dann kommen Zeit und Gramm aus dem Druckprofil`
+      : `${n} · nicht geslict – Druckzeit und Gramm je Platte eintragen (oder in Bambu Studio „Platte slicen“ und als .gcode.3mf exportieren)`, r.source || "upload", title);
+    toast(r.source === "makerworld" ? "Werte aus dem MakerWorld-Druckprofil übernommen" : r.sliced ? "3MF importiert" : "Projekt ohne Slice-Daten übernommen – Zeit und Gramm bitte eintragen");
   } catch (e) { toast("Datei konnte nicht gelesen werden: " + e.message); }
 }
 async function cxFromLibraryFile(model, file) {

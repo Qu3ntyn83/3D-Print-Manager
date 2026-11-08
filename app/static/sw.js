@@ -1,5 +1,5 @@
 // 3D Print Manager – Service Worker: App-Shell offline, API immer live
-const CACHE = "3dm-shell-v25";
+const CACHE = "3dm-shell-v26";
 const SHELL = ["/", "/static/style.css", "/static/app.js", "/static/extras.js", "/static/stats.js", "/static/library.js", "/static/calc.js", "/static/icons/favicon.svg", "/static/vendor/qrcode.js", "/static/icons/icon-192.png", "/manifest.webmanifest"];
 // cache: "reload" – sonst landet beim Update die alte Datei aus dem Browser-Cache im neuen Offline-Cache
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting())); });
