@@ -514,6 +514,25 @@ def profiles(mid):
     return jsonify({"ok": True, "profiles": out})
 
 
+@bp.get("/plates-for-file")
+def plates_for_file():
+    """MakerWorld-3MF ohne Slice-Daten direkt geöffnet: über DesignModelId/DesignProfileId aus der Datei
+    das passende Bibliotheksmodell finden und dessen Druckprofil-Platten liefern."""
+    model_id = (request.args.get("model_id") or "").strip()
+    profile_id = request.args.get("profile_id", type=int)
+    with conn() as c:
+        m = None
+        if model_id:
+            m = c.execute("SELECT id, mw_profile_id FROM lib_models WHERE mw_model_id=?", (model_id,)).fetchone()
+        if not m and profile_id:
+            m = c.execute("SELECT id, mw_profile_id FROM lib_models WHERE mw_profile_id=?", (profile_id,)).fetchone()
+        if not m:
+            return jsonify({"ok": False, "error": "Modell nicht in der Bibliothek"}), 404
+        if profile_id and profile_id != m["mw_profile_id"]:
+            c.execute("UPDATE lib_models SET mw_profile_id=? WHERE id=?", (profile_id, m["id"]))
+    return plates(m["id"])
+
+
 @bp.get("/plates/<int:mid>")
 def plates(mid):
     """Platten des gewählten Druckprofils (Zeit, Gramm, Filamente) frisch von MakerWorld – für die Kalkulation."""

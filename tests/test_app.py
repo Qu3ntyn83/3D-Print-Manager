@@ -311,7 +311,11 @@ def test_library_cleanup(client):
     assert not library.file_path(fb, "stl").exists() and library.file_path(fa, "stl").exists()
     library.analyze_now(fa)
     r = client.get("/api/library/cleanup").json
-    assert not any(r["counts"][k] for k in ("orphan_files", "orphan_thumbs", "missing_files", "missing_thumbs", "duplicates"))
+    # nur die eigenen Einträge prüfen – andere Tests legen parallel Dateien an, der Analyse-Worker läuft im Hintergrund
+    mine = {fa, fb, fc}
+    assert not r["orphan_files"] and not r["orphan_thumbs"]
+    assert not {x["id"] for x in r["missing_files"] + r["missing_thumbs"]} & mine
+    assert not [g for g in r["duplicates"] if g["keep"]["id"] in mine or {x["id"] for x in g["remove"]} & mine]
 
 
 def test_makerworld_sync_mocked(client, monkeypatch):
@@ -513,8 +517,8 @@ def test_makerworld_plates_for_calc(client, monkeypatch):
     import makerworld
     from ams import conn as dbconn
     with dbconn() as c:
-        mid = c.execute("INSERT INTO lib_models (title, source, mw_design_id, mw_profile_id, created_at, updated_at) VALUES ('Zug','makerworld',4242,77,'x','x')").lastrowid
-    design = {"id": 4242, "instances": [
+        mid = c.execute("INSERT INTO lib_models (title, source, mw_design_id, mw_profile_id, created_at, updated_at) VALUES ('Zug','makerworld',990004242,77,'x','x')").lastrowid
+    design = {"id": 990004242, "instances": [
         {"profileId": 11, "extention": {"modelInfo": {"plates": [{"index": 1, "prediction": 100, "weight": 1, "filaments": []}]}}},
         {"profileId": 77, "extention": {"modelInfo": {"plates": [
             {"index": 1, "prediction": 5910, "weight": 38, "objects": [{}], "filaments": [{"id": "1", "type": "PLA", "color": "#368CF9", "usedG": "38"}]},
