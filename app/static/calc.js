@@ -265,29 +265,87 @@ function cxUseJob(plates, file, meta, source, title) {
   if (title) { $("#cqTitle").value = title; store.set("cqTitle", title); }
   cxSaveJob(); setTab("calc"); cxSetSub("calc");
 }
+/* 3MF lesen: 1. slice_info.config (Bambu Studio / OrcaSlicer, geslict)
+               2. Kopf von Metadata/plate_N.gcode (falls slice_info fehlt oder nicht lesbar)
+               3. Projektdatei ohne Slicing: Platten + Filamente übernehmen, Zeit/Gramm von Hand */
+const CX_META = n => n === "Metadata/slice_info.config" || n === "Metadata/model_settings.config" || n === "Metadata/project_settings.config";
+function cxAttr(tag, name) { const m = tag.match(new RegExp(`\\b${name}="([^"]*)"`)); return m ? m[1] : null; }
+function cxSliceInfo(text) {
+  // bewusst ohne DOMParser: ein einziges unmaskiertes Zeichen im Objektnamen machte sonst die ganze Datei unlesbar
+  return [...text.matchAll(/<plate>([\s\S]*?)<\/plate>/g)].map((m, i) => {
+    const body = m[1], meta = {};
+    for (const t of body.matchAll(/<metadata\b[^>]*>/g)) { const k = cxAttr(t[0], "key"); if (k) meta[k] = cxAttr(t[0], "value"); }
+    return { index: +(meta.index || i + 1), seconds: Math.round(+meta.prediction || 0), objects: (body.match(/<object\b/g) || []).length,
+      filaments: [...body.matchAll(/<filament\b[^>]*>/g)].map(t => ({ id: cxAttr(t[0], "id"), type: cxAttr(t[0], "type"), color: cxAttr(t[0], "color"), g: +cxAttr(t[0], "used_g") || 0 })) };
+  });
+}
+function cxGcodeHead(text, index, proj) {
+  const hms = s => { let t = 0; for (const [, v, u] of String(s).matchAll(/(\d+(?:\.\d+)?)\s*([dhms])/g)) t += +v * { d: 86400, h: 3600, m: 60, s: 1 }[u]; return t; };
+  const tm = text.match(/;\s*total estimated time\s*[:=]\s*([^;\n]+)/i) || text.match(/;\s*(?:model printing time|estimated printing time \(normal mode\))\s*[:=]\s*([^;\n]+)/i);
+  // Bambu Studio: „; total filament weight [g] : 23.43,8.70“ + „; filament: 1,4“ (genutzte Filament-Nummern)
+  const w = (text.match(/;\s*total filament weight \[g\]\s*:\s*([^\n]+)/i) || text.match(/;\s*filament used \[g\]\s*=\s*([^\n]+)/i) || [])[1];
+  const grams = w ? w.split(/[,;]/).map(x => +x || 0) : [];
+  const ids = ((text.match(/;\s*filament\s*:\s*([\d,\s]+)\n/i) || [])[1] || "").split(",").map(x => +x).filter(Boolean);
+  const types = proj.filament_type || [], cols = proj.filament_colour || [];
+  return { index, seconds: Math.round(tm ? hms(tm[1]) : 0), objects: 0,
+    filaments: grams.map((g, k) => { const id = ids.length === grams.length ? ids[k] : k + 1;
+      return { id: String(id), type: types[id - 1] || "", color: cols[id - 1] || "#888888", g }; }).filter(f => f.g > 0) };
+}
+async function cxRead3mf(buf) {
+  if (typeof fflate === "undefined") await libScript("/static/vendor/three/fflate.min.js");
+  const u8 = new Uint8Array(buf);
+  const meta = fflate.unzipSync(u8, { filter: f => CX_META(f.name) });
+  const txt = n => meta[n] ? fflate.strFromU8(meta[n]) : "";
+  let proj = {}; try { proj = JSON.parse(txt("Metadata/project_settings.config") || "{}"); } catch { /* ältere Formate */ }
+  let list = txt("Metadata/slice_info.config") ? cxSliceInfo(txt("Metadata/slice_info.config")) : [];
+  if (!list.some(p => p.seconds > 0)) {
+    // G-Code-Kopf lesen – nur die ersten 64 KB jeder Platte entpacken wäre ideal, unzipSync entpackt ganz; deshalb einzeln
+    const names = [];
+    fflate.unzipSync(u8, { filter: f => { if (/^Metadata\/plate_\d+\.gcode$/.test(f.name)) names.push(f.name); return false; } });
+    const fromG = [];
+    for (const n of names) {
+      const g = fflate.unzipSync(u8, { filter: f => f.name === n })[n];
+      const head = fflate.strFromU8(g.subarray(0, 65536)) + "\n" + fflate.strFromU8(g.subarray(Math.max(0, g.length - 65536)));
+      fromG.push(cxGcodeHead(head, +n.match(/plate_(\d+)/)[1], proj));
+    }
+    if (fromG.some(p => p.seconds > 0)) list = fromG;
+  }
+  if (list.some(p => p.seconds > 0)) return { list: list.filter(p => p.seconds > 0 || p.filaments.length), sliced: true };
+  // Projekt ohne Slicing: Platten aus model_settings.config, Filamente aus den Projekteinstellungen
+  const ms = txt("Metadata/model_settings.config");
+  const ids = ms ? [...ms.matchAll(/<plate>([\s\S]*?)<\/plate>/g)].map((m, i) => {
+    const id = [...m[1].matchAll(/<metadata\b[^>]*>/g)].map(t => t[0]).find(t => cxAttr(t, "key") === "plater_id");
+    return { index: +(id ? cxAttr(id, "value") : i + 1), objects: (m[1].match(/<model_instance>/g) || []).length };
+  }) : [];
+  const fil = (proj.filament_type || []).map((t, k) => ({ id: String(k + 1), type: t, color: (proj.filament_colour || [])[k] || "#888888", g: 0 }));
+  // welche Filamente eine Platte nutzt, steht erst nach dem Slicen fest → erstes Projektfilament als Vorschlag
+  const plates = (ids.length ? ids : [{ index: 1, objects: 0 }]).map(p => ({ ...p, seconds: 0, filaments: fil.slice(0, 1) }));
+  return { list: plates, sliced: false, hasModel: !!ms || fil.length > 0 };
+}
 async function cxImportFile(file) {
   try {
-    if (typeof fflate === "undefined") await libScript("/static/vendor/three/fflate.min.js");
-    const files = fflate.unzipSync(new Uint8Array(await file.arrayBuffer()), { filter: f => f.name === "Metadata/slice_info.config" });
-    const raw = files["Metadata/slice_info.config"];
-    if (!raw) return toast("Keine Slice-Daten gefunden. Datei vorher in Bambu Studio oder OrcaSlicer slicen.");
-    const xml = new DOMParser().parseFromString(fflate.strFromU8(raw), "application/xml");
-    const list = [...xml.querySelectorAll("plate")].map((pl, i) => {
-      const meta = {}; pl.querySelectorAll(":scope > metadata").forEach(m => meta[m.getAttribute("key")] = m.getAttribute("value"));
-      return { index: +(meta.index || i + 1), seconds: +meta.prediction || 0, objects: pl.querySelectorAll("object").length,
-        filaments: [...pl.querySelectorAll("filament")].map(f => ({ id: f.getAttribute("id"), type: f.getAttribute("type"), color: f.getAttribute("color"), g: +f.getAttribute("used_g") || 0 })) };
-    });
-    const plates = cxPlatesFrom(list);
-    if (!plates.length) return toast("Datei enthält keine geslicten Platten");
-    cxUseJob(plates, file.name, `${plates.length} ${plates.length === 1 ? "Druckplatte" : "Druckplatten"} · Filament automatisch zugeordnet, bitte prüfen`, "upload",
-      file.name.replace(/(\.gcode)?\.3mf$/i, "").replace(/[_-]+/g, " "));
-    toast("3MF importiert");
+    const r = await cxRead3mf(await file.arrayBuffer());
+    const title = file.name.replace(/(\.gcode)?\.3mf$/i, "").replace(/[_-]+/g, " ");
+    if (!r.list.length || (!r.sliced && !r.hasModel)) return toast("Keine 3MF von Bambu Studio / OrcaSlicer – Werte bitte von Hand eintragen");
+    const plates = r.sliced ? cxPlatesFrom(r.list) : cxPlatesFrom(r.list.map(p => ({ ...p, filaments: p.filaments.length ? p.filaments : [{ id: "1", type: "", color: "#888888", g: 0 }] })))
+      .map(p => ({ ...p, lines: p.lines.map(l => ({ ...l, grams: l.grams || 0 })) }));
+    const n = `${plates.length} ${plates.length === 1 ? "Druckplatte" : "Druckplatten"}`;
+    cxUseJob(plates, file.name, r.sliced ? `${n} · Filament automatisch zugeordnet, bitte prüfen`
+      : `${n} · nicht geslict – Druckzeit und Gramm je Platte eintragen (oder in Bambu Studio „Platte slicen“ und als .gcode.3mf exportieren)`, "upload", title);
+    toast(r.sliced ? "3MF importiert" : "Projekt ohne Slice-Daten übernommen – Zeit und Gramm bitte eintragen");
   } catch (e) { toast("Datei konnte nicht gelesen werden: " + e.message); }
 }
 async function cxFromLibraryFile(model, file) {
   if (!CX.cfg) await cxLoad();
-  const plates = cxPlatesFrom((file.meta && file.meta.plates) || []);
-  if (!plates.length) return toast(file.analyzing ? "Datei wird noch ausgewertet – gleich nochmal versuchen" : "Diese Datei ist nicht geslict. In Bambu Studio slicen und erneut hochladen.");
+  let plates = cxPlatesFrom(((file.meta && file.meta.plates) || []).filter(p => p.seconds));
+  if (!plates.length) {
+    if (file.analyzing) return toast("Datei wird noch ausgewertet – gleich nochmal versuchen");
+    // nicht geslict laut Analyse → Datei selbst lesen (G-Code-Kopf bzw. Projekt ohne Slice-Daten)
+    const res = await fetch(`/api/library/files/${file.id}/${encodeURIComponent(file.name)}`);
+    if (!res.ok) return toast("Datei konnte nicht geladen werden");
+    const blob = await res.blob();
+    return cxImportFile(new File([blob], file.name));
+  }
   cxUseJob(plates, file.name, `${model.title} · ${plates.length} ${plates.length === 1 ? "Druckplatte" : "Druckplatten"} · aus der Bibliothek`, "library", model.title);
   toast("In die Kalkulation übernommen");
 }
@@ -301,9 +359,9 @@ function cxRenderLib() {
     const m = CX.libSel, fl = m.file_list.filter(f => f.kind === "3mf");
     $("#cxLibList").innerHTML = `<button type="button" class="ghost mini" data-libback>← zurück</button><h3>${esc(m.title)}</h3>` + (fl.map(f => {
       const pl = ((f.meta && f.meta.plates) || []).filter(p => p.seconds);
-      return `<button type="button" class="cx-libitem" data-libfile="${f.id}" ${pl.length ? "" : "disabled"}>
+      return `<button type="button" class="cx-libitem" data-libfile="${f.id}" ${f.analyzing ? "disabled" : ""}>
         ${f.thumb ? `<img src="${esc(f.thumb)}" alt="" loading="lazy">` : `<span class="cx-libph">3MF</span>`}
-        <span><b>${esc(f.name)}</b><small class="muted">${pl.length ? `${pl.length} ${pl.length === 1 ? "Platte" : "Platten"} · ${cxNum(f.seconds / 3600, 1)} h · ${cxNum(f.grams, 0)} g` : f.analyzing ? "wird ausgewertet …" : "nicht geslict"}</small></span></button>`;
+        <span><b>${esc(f.name)}</b><small class="muted">${pl.length ? `${pl.length} ${pl.length === 1 ? "Platte" : "Platten"} · ${cxNum(f.seconds / 3600, 1)} h · ${cxNum(f.grams, 0)} g` : f.analyzing ? "wird ausgewertet …" : "nicht geslict – Zeit und Gramm von Hand"}</small></span></button>`;
     }).join("") || `<p class="muted">Keine 3MF-Datei in diesem Modell.</p>`);
     return;
   }
