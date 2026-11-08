@@ -330,6 +330,7 @@ async function openSettings() {
   }).catch(() => {});
   $(".menu").open = false;
   $("#setDlg").showModal();
+  api("/api/version").then(v => { $("#appVersion").textContent = `Version ${v.build} · Oberfläche ${v.ui}`; }).catch(() => {});
 }
 function renderProfTable() {
   const cols = [["nozzle_min", "Düse min"], ["nozzle_max", "Düse max"], ["bed_min", "Bett min"], ["bed_max", "Bett max"], ["dry_temp", "Trocknen °C"], ["dry_hours", "h"], ["open_days", "offen max. Tage"]];

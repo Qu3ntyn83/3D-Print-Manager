@@ -56,6 +56,8 @@ def init_schema():
     THUMB_DIR.mkdir(parents=True, exist_ok=True)
     with conn() as c:
         c.executescript(SCHEMA)
+        if "mw_plates" not in {r[1] for r in c.execute("PRAGMA table_info(lib_models)")}:
+            c.execute("ALTER TABLE lib_models ADD COLUMN mw_plates TEXT")  # Platten des MakerWorld-Druckprofils (Zeit, Gramm)
 
 
 def norm_tag(t: str) -> str:
@@ -203,7 +205,8 @@ def model_out(c, m, full=False) -> dict:
          "created_at": m["created_at"], "updated_at": m["updated_at"]}
     if full:
         d.update(description=m["description"], notes=m["notes"], license=m["license"], mw_design_id=m["mw_design_id"],
-                 mw_instance_title=m["mw_instance_title"], mw_synced_at=m["mw_synced_at"],
+                 mw_instance_title=m["mw_instance_title"], mw_synced_at=m["mw_synced_at"], mw_profile_id=m["mw_profile_id"],
+                 mw_plates=json.loads(m["mw_plates"]) if m["mw_plates"] else None,
                  file_list=[file_out(f) for f in files])
     return d
 

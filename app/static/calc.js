@@ -106,7 +106,7 @@ function cxRenderCalc() {
   const j = CX.job, p = cxPlate();
   $("#cxFile").textContent = j.file || "Eigenes Projekt";
   $("#cxMeta").textContent = j.meta || "Werte eintragen oder eine 3MF laden";
-  $("#cxPlateSrc").textContent = j.source === "manual" ? "manuelle Eingabe" : j.source === "library" ? "aus der Bibliothek" : "aus slice_info.config";
+  $("#cxPlateSrc").textContent = { manual: "manuelle Eingabe", library: "aus der Bibliothek", makerworld: "MakerWorld-Druckprofil" }[j.source] || "aus der 3MF";
   const multi = j.plates.length > 1, all = cxScope() === "all";
   $("#cxPlates").innerHTML = (multi ? `<div class="seg mini cx-scope" role="group" aria-label="Berechnen">
       <button type="button" data-scope="all" class="${all ? "active" : ""}">Komplett · ${j.plates.length} Platten · ${cxNum(j.plates.reduce((a, x) => a + (+x.hours || 0), 0))} h</button>
@@ -338,6 +338,16 @@ async function cxImportFile(file) {
 async function cxFromLibraryFile(model, file) {
   if (!CX.cfg) await cxLoad();
   let plates = cxPlatesFrom(((file.meta && file.meta.plates) || []).filter(p => p.seconds));
+  if (!plates.length && model.mw_design_id) {
+    // MakerWorld-Projektdateien sind nicht geslict – Bambu nennt Zeit und Gramm je Platte aber im Druckprofil
+    let mw = (model.mw_plates || []).filter(p => p.seconds);
+    if (!mw.length) { try { mw = ((await api(`/api/makerworld/plates/${model.id}`)).plates || []).filter(p => p.seconds); } catch { mw = []; } }
+    if (mw.length) {
+      plates = cxPlatesFrom(mw);
+      cxUseJob(plates, file.name, `${model.title} · ${plates.length} ${plates.length === 1 ? "Druckplatte" : "Druckplatten"} · Zeiten und Gramm aus dem MakerWorld-Druckprofil`, "makerworld", model.title);
+      return toast("Werte aus dem MakerWorld-Druckprofil übernommen");
+    }
+  }
   if (!plates.length) {
     if (file.analyzing) return toast("Datei wird noch ausgewertet – gleich nochmal versuchen");
     // nicht geslict laut Analyse → Datei selbst lesen (G-Code-Kopf bzw. Projekt ohne Slice-Daten)
@@ -361,7 +371,7 @@ function cxRenderLib() {
       const pl = ((f.meta && f.meta.plates) || []).filter(p => p.seconds);
       return `<button type="button" class="cx-libitem" data-libfile="${f.id}" ${f.analyzing ? "disabled" : ""}>
         ${f.thumb ? `<img src="${esc(f.thumb)}" alt="" loading="lazy">` : `<span class="cx-libph">3MF</span>`}
-        <span><b>${esc(f.name)}</b><small class="muted">${pl.length ? `${pl.length} ${pl.length === 1 ? "Platte" : "Platten"} · ${cxNum(f.seconds / 3600, 1)} h · ${cxNum(f.grams, 0)} g` : f.analyzing ? "wird ausgewertet …" : "nicht geslict – Zeit und Gramm von Hand"}</small></span></button>`;
+        <span><b>${esc(f.name)}</b><small class="muted">${pl.length ? `${pl.length} ${pl.length === 1 ? "Platte" : "Platten"} · ${cxNum(f.seconds / 3600, 1)} h · ${cxNum(f.grams, 0)} g` : f.analyzing ? "wird ausgewertet …" : m.mw_design_id ? "Zeiten aus dem MakerWorld-Druckprofil" : "nicht geslict – Zeit und Gramm von Hand"}</small></span></button>`;
     }).join("") || `<p class="muted">Keine 3MF-Datei in diesem Modell.</p>`);
     return;
   }
@@ -525,7 +535,7 @@ $("#cxLibDlg").addEventListener("click", async e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.libback !== undefined) { CX.libSel = null; return cxRenderLib(); }
   if (b.dataset.libmodel) { CX.libSel = await api(`/api/library/models/${b.dataset.libmodel}`); const fl = CX.libSel.file_list.filter(f => f.kind === "3mf");
-    if (fl.length === 1 && fl[0].meta && (fl[0].meta.plates || []).some(p => p.seconds)) { $("#cxLibDlg").close(); return cxFromLibraryFile(CX.libSel, fl[0]).catch(err => toast("Kalkulation: " + err.message)); }
+    if (fl.length === 1 && ((fl[0].meta && (fl[0].meta.plates || []).some(p => p.seconds)) || CX.libSel.mw_design_id)) { $("#cxLibDlg").close(); return cxFromLibraryFile(CX.libSel, fl[0]).catch(err => toast("Kalkulation: " + err.message)); }
     return cxRenderLib(); }
   if (b.dataset.libfile) { const f = CX.libSel.file_list.find(x => x.id === +b.dataset.libfile); $("#cxLibDlg").close(); cxFromLibraryFile(CX.libSel, f).catch(err => toast("Kalkulation: " + err.message)); }
 });
