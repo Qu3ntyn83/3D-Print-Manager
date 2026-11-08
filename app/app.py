@@ -17,6 +17,9 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 ALLOWED_IMG = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
+# Oberfläche nie ungeprüft aus dem Browser-Cache: immer kurz nachfragen (ETag → 304, kostet im LAN nichts).
+# Ohne Angabe raten Browser eine Haltezeit und zeigen nach einem Update noch stundenlang alte Skripte.
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 # Obergrenze für Uploads: groß genug für Druckdateien der Bibliothek; Fotos prüfen ihre Größe selbst
 app.config["MAX_CONTENT_LENGTH"] = (int(os.environ.get("LIBRARY_MAX_MB", "500")) + 20) * 1024 * 1024
 
@@ -458,9 +461,29 @@ def import_json():
     return jsonify({"ok": True})
 
 
+def _asset_version() -> str:
+    """Kurzer Hash über Skripte und Styles – wechselt mit jedem Update, hängt als ?v= an den Links."""
+    import hashlib
+    h = hashlib.sha1()
+    for p in sorted(Path(app.static_folder).glob("*.js")) + sorted(Path(app.static_folder).glob("*.css")):
+        h.update(p.read_bytes())
+    return h.hexdigest()[:10]
+
+
+_INDEX = {}
+
+
 @app.get("/")
 def index():
-    return send_from_directory(app.static_folder, "index.html")
+    if "html" not in _INDEX or app.debug:
+        import re
+        v = _asset_version()
+        html = (Path(app.static_folder) / "index.html").read_text(encoding="utf-8")
+        _INDEX["html"] = re.sub(r'((?:src|href)="/static/[\w./-]+\.(?:js|css))"', rf'\1?v={v}"', html)
+        _INDEX["v"] = v
+    r = app.response_class(_INDEX["html"], mimetype="text/html")
+    r.headers["Cache-Control"] = "no-cache"
+    return r
 
 
 @app.get("/s/<int:uid>")
@@ -492,6 +515,12 @@ def service_worker():
 @app.get("/healthz")
 def health():
     return "ok"
+
+
+@app.get("/api/version")
+def version():
+    """Laufende Version (Image-Build und Hash der Oberfläche) – zum Prüfen nach einem Update."""
+    return jsonify({"build": os.environ.get("APP_BUILD", "lokal"), "ui": _INDEX.get("v") or _asset_version()})
 
 
 from bambu import bp as bambu_bp, linked_spools, start_scheduler  # noqa: E402

@@ -68,11 +68,11 @@ def api_get(cl, path: str, auth=True) -> dict:
     try:
         r = cl._req("get", url, auth=auth and bool(cl.token), headers={"Referer": "https://makerworld.com/", "User-Agent": UA})
     except AuthExpired as e:
-        raise MWStop("Bambu-Anmeldung abgelaufen – unter Bambu & AMS → Drucker & Konto neu anmelden") from e
+        raise MWStop("Bambu-Anmeldung abgelaufen – unter Drucker → Einrichten neu anmelden") from e
     except CloudError as e:
         raise MWStop(str(e)) from e
     if r.status_code == 401:
-        raise MWStop("Bambu-Anmeldung abgelaufen – unter Bambu & AMS → Drucker & Konto neu anmelden")
+        raise MWStop("Bambu-Anmeldung abgelaufen – unter Drucker → Einrichten neu anmelden")
     if r.status_code in (403, 418, 429):
         txt = (r.text or "")[:200]
         if "captcha" in txt.lower() or r.status_code in (418, 429):
@@ -199,9 +199,23 @@ def pick_instance(c, d: dict) -> dict | None:
     return default or insts[0]
 
 
+def inst_plates(inst: dict | None) -> list:
+    """Platten eines Druckprofils mit Bambus Angaben (Druckzeit, Gramm, Filamente) – auch ohne Download."""
+    out = []
+    for i, p in enumerate(((inst or {}).get("extention") or {}).get("modelInfo", {}).get("plates") or [], 1):
+        fil = [{"id": str(f.get("id") or k + 1), "type": f.get("type"), "color": f.get("color"), "g": float(f.get("usedG") or 0)}
+               for k, f in enumerate(p.get("filaments") or [])]
+        out.append({"index": int(p.get("index") or i), "name": p.get("name"), "seconds": int(p.get("prediction") or 0) or None,
+                    "grams": float(p.get("weight") or 0) or None, "objects": len(p.get("objects") or []), "filaments": fil})
+    return out
+
+
 def apply_details(c, mid: int, d: dict, import_tags: bool):
     import library
     inst = pick_instance(c, d)
+    cur = c.execute("SELECT mw_profile_id FROM lib_models WHERE id=?", (mid,)).fetchone()
+    chosen = next((i for i in d.get("instances") or [] if cur and cur["mw_profile_id"] and i.get("profileId") == cur["mw_profile_id"]), None)
+    c.execute("UPDATE lib_models SET mw_plates=? WHERE id=?", (json.dumps(inst_plates(chosen or inst)) or None, mid))
     c.execute("""UPDATE lib_models SET title=?, description=COALESCE(description, ?), license=?, creator=COALESCE(?, creator),
                  mw_model_id=?, mw_url=?, mw_cover_url=COALESCE(?, mw_cover_url), mw_profile_id=?, mw_instance_title=?, mw_synced_at=?
                  WHERE id=?""",
@@ -498,6 +512,25 @@ def profiles(mid):
                     "ams": bool(i.get("needAms")), "grams": i.get("weight"), "seconds": i.get("prediction"), "plates": len((i.get("extention") or {}).get("modelInfo", {}).get("plates") or []) or None,
                     "selected": i.get("profileId") == m["mw_profile_id"], "cover": i.get("cover"), "downloads": i.get("downloadCount")})
     return jsonify({"ok": True, "profiles": out})
+
+
+@bp.get("/plates/<int:mid>")
+def plates(mid):
+    """Platten des gewählten Druckprofils (Zeit, Gramm, Filamente) frisch von MakerWorld – für die Kalkulation."""
+    with conn() as c:
+        m = c.execute("SELECT * FROM lib_models WHERE id=?", (mid,)).fetchone()
+    if not m or not m["mw_design_id"]:
+        abort(404)
+    try:
+        d = api_get(client(), f"/v1/design-service/design/{m['mw_design_id']}", auth=False)
+    except MWError as e:
+        cached = json.loads(m["mw_plates"]) if m["mw_plates"] else []
+        return jsonify({"ok": bool(cached), "plates": cached, "error": str(e)}), (200 if cached else 502)
+    with conn() as c:
+        inst = next((i for i in d.get("instances") or [] if m["mw_profile_id"] and i.get("profileId") == m["mw_profile_id"]), None) or pick_instance(c, d)
+        pl = inst_plates(inst)
+        c.execute("UPDATE lib_models SET mw_plates=? WHERE id=?", (json.dumps(pl), mid))
+    return jsonify({"ok": True, "plates": pl, "profile": (inst or {}).get("titleTranslated") or (inst or {}).get("title")})
 
 
 @bp.post("/download/<int:mid>")

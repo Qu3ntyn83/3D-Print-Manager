@@ -496,3 +496,30 @@ def test_ams_moved_to_other_printer(client):
     # ams_exist_bits: AMS 0 abgezogen
     p1._on_message(None, None, msg(1, [], "0"))
     assert slots(ids[0]) == set()
+
+
+def test_ui_not_stale_after_update(client):
+    """Skripte tragen eine Version im Link, statische Dateien müssen immer revalidiert werden."""
+    import re as _re
+    html = client.get("/").get_data(as_text=True)
+    v = client.get("/api/version").json["ui"]
+    assert _re.search(r'src="/static/calc\.js\?v=' + v + '"', html) and f'href="/static/style.css?v={v}"' in html
+    r = client.get("/static/calc.js")
+    assert "max-age=0" in r.headers.get("Cache-Control", "") or "no-cache" in r.headers.get("Cache-Control", "")
+
+
+def test_makerworld_plates_for_calc(client, monkeypatch):
+    """Nicht geslicte MakerWorld-3MF: Zeiten und Gramm kommen aus dem Druckprofil."""
+    import makerworld
+    from ams import conn as dbconn
+    with dbconn() as c:
+        mid = c.execute("INSERT INTO lib_models (title, source, mw_design_id, mw_profile_id, created_at, updated_at) VALUES ('Zug','makerworld',4242,77,'x','x')").lastrowid
+    design = {"id": 4242, "instances": [
+        {"profileId": 11, "extention": {"modelInfo": {"plates": [{"index": 1, "prediction": 100, "weight": 1, "filaments": []}]}}},
+        {"profileId": 77, "extention": {"modelInfo": {"plates": [
+            {"index": 1, "prediction": 5910, "weight": 38, "objects": [{}], "filaments": [{"id": "1", "type": "PLA", "color": "#368CF9", "usedG": "38"}]},
+            {"index": 2, "prediction": 6809, "weight": 43, "filaments": [{"id": "2", "type": "PETG", "color": "#000000", "usedG": "43"}]}]}}}]}
+    monkeypatch.setattr(makerworld, "api_get", lambda cl, path, auth=True: design)
+    r = client.get(f"/api/makerworld/plates/{mid}").json
+    assert [(p["index"], p["seconds"], p["filaments"][0]["g"]) for p in r["plates"]] == [(1, 5910, 38.0), (2, 6809, 43.0)]
+    assert client.get(f"/api/library/models/{mid}").json["mw_plates"][1]["filaments"][0]["type"] == "PETG"
