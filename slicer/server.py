@@ -112,7 +112,10 @@ class H(BaseHTTPRequestHandler):
             if left or not zipfile.is_zipfile(src):
                 return self._json(400, {"ok": False, "error": "keine gültige 3MF-Datei"})
             with LOCK:
-                res = slice_file(src, work)
+                try:
+                    res = slice_file(src, work)
+                except Exception as e:  # noqa: BLE001 – der Dienst soll immer JSON antworten
+                    res = {"ok": False, "error": f"Slicer konnte nicht gestartet werden: {e}", "version": VERSION}
             self._json(200 if res["ok"] else 422, res)
         finally:
             shutil.rmtree(work, ignore_errors=True)

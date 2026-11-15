@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 RUN curl -fsSL -o /tmp/bs.AppImage "$BAMBU_URL" && chmod +x /tmp/bs.AppImage \
     && cd /opt && /tmp/bs.AppImage --appimage-extract >/dev/null && mv squashfs-root bambu && rm /tmp/bs.AppImage \
-    && echo "$BAMBU_URL" | sed -E 's#.*/download/v?([^/]+)/.*#\1#' > /opt/bambu/VERSION
+    && echo "$BAMBU_URL" | sed -E 's#.*/download/v?([^/]+)/.*#\1#' > /opt/bambu/VERSION \
+    && chmod -R a+rX /opt/bambu
 COPY server.py /opt/server.py
 RUN useradd -m -u 1000 slicer 2>/dev/null || usermod -l slicer -d /home/slicer -m ubuntu
 USER 1000
