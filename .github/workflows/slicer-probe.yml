@@ -6,35 +6,38 @@ jobs:
   probe:
     runs-on: ubuntu-24.04
     steps:
-      - name: Assets
-        env: { GH_TOKEN: "${{ github.token }}" }
+      - uses: actions/checkout@v4
+      - name: Image bauen
+        run: docker build -t slicer-test slicer 2>&1 | tail -15 && docker images slicer-test
+      - name: Starten
         run: |
-          gh release view --repo bambulab/BambuStudio --json tagName,assets -q '.tagName, (.assets[] | "\(.name) \(.size)")'
-          gh release download --repo bambulab/BambuStudio --pattern '*buntu-24.04*.AppImage' -O bs.AppImage || gh release download --repo bambulab/BambuStudio --pattern '*.AppImage' -D dl
-          ls -la . dl 2>/dev/null || true
-      - name: Entpacken
-        run: |
-          f=$(ls bs.AppImage dl/*.AppImage 2>/dev/null | head -1); chmod +x "$f"; "$f" --appimage-extract >/dev/null; ls squashfs-root | head -30; du -sh squashfs-root
-      - name: Fixtures
+          docker run -d --name s -p 8080:8080 slicer-test && sleep 3 && docker logs s && curl -s localhost:8080/healthz
+      - name: Echte Projektdatei slicen
         run: |
           curl -sSL -o duck.3mf https://raw.githubusercontent.com/MarcinZukowski/filadeep/HEAD/web/models/duck.3mf
+          time curl -s -X POST --data-binary @duck.3mf -H 'Content-Type: application/octet-stream' localhost:8080/slice | python3 -c "import json,sys,re; d=json.load(sys.stdin); print({k:v for k,v in d.items() if k!='slice_info'}); print(re.findall(r'key=\"(?:index|prediction|weight)\" value=\"[^\"]*\"|<filament [^>]{0,90}', d.get('slice_info','')))"
+      - name: Kaputte Datei
+        run: |
           curl -sSL -o multi.3mf https://raw.githubusercontent.com/GhsVilela/FF-3MF-Converter/HEAD/tests/fixtures/multi-plate-preview.3mf
-          ls -la *.3mf
-      - name: Slicen ohne Zusatzpakete
+          curl -s -X POST --data-binary @multi.3mf localhost:8080/slice | cut -c1-600; echo
+          echo "kein zip" > x.3mf; curl -s -X POST --data-binary @x.3mf localhost:8080/slice; echo
+      - name: Projekt aus STL erzeugen (für eigenen Test-Fixture)
         continue-on-error: true
         run: |
-          cd squashfs-root && (time ./AppRun --slice 0 --debug 2 --export-3mf $PWD/../out1.3mf $PWD/../duck.3mf) 2>&1 | tail -40; ls -la ../out1.3mf && unzip -p ../out1.3mf Metadata/slice_info.config | head -40
-      - name: Fehlende Bibliotheken
-        run: |
-          cd squashfs-root && ldd bin/bambu-studio 2>/dev/null | grep "not found" || echo "alle Bibliotheken vorhanden"; ls bin | head
-      - name: Slicen mit Paketen
-        continue-on-error: true
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq libgl1 libegl1 libgtk-3-0t64 libwebkit2gtk-4.1-0 libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 xvfb >/dev/null
-          cd squashfs-root && ldd bin/bambu-studio 2>/dev/null | grep "not found" || echo "alle Bibliotheken vorhanden"
-          (time ./AppRun --slice 0 --debug 2 --export-3mf $PWD/../out2.3mf $PWD/../duck.3mf) 2>&1 | tail -40; ls -la ../out2.3mf && unzip -p ../out2.3mf Metadata/slice_info.config | head -60
-          (time ./AppRun --slice 0 --debug 2 --export-3mf $PWD/../out3.3mf $PWD/../multi.3mf) 2>&1 | tail -30; ls -la ../out3.3mf && unzip -p ../out3.3mf Metadata/slice_info.config | grep -E "index|prediction|weight|<filament" | head -40
-      - name: Mit xvfb
-        continue-on-error: true
-        run: |
-          cd squashfs-root && (time xvfb-run -a ./AppRun --slice 0 --debug 2 --export-3mf $PWD/../out4.3mf $PWD/../duck.3mf) 2>&1 | tail -30; ls -la ../out4.3mf && unzip -p ../out4.3mf Metadata/slice_info.config | grep -E "index|prediction|weight|<filament" | head
+          python3 - <<'PY'
+          import struct
+          v=[(0,0,0),(20,0,0),(20,20,0),(0,20,0),(0,0,10),(20,0,10),(20,20,10),(0,20,10)]
+          f=[(0,2,1),(0,3,2),(4,5,6),(4,6,7),(0,1,5),(0,5,4),(1,2,6),(1,6,5),(2,3,7),(2,7,6),(3,0,4),(3,4,7)]
+          with open("cube.stl","wb") as o:
+              o.write(b"\0"*80+struct.pack("<I",len(f)))
+              for a,b,c in f: o.write(struct.pack("<12fH",0,0,0,*v[a],*v[b],*v[c],0))
+          PY
+          docker cp cube.stl s:/tmp/cube.stl
+          docker exec s sh -c 'ls /opt/bambu/resources/profiles/BBL/ | head; ls /opt/bambu/resources/profiles/BBL/machine | grep -i "A1 0.4" | head -3; ls /opt/bambu/resources/profiles/BBL/process | grep -i "0.20mm Standard @BBL A1" | head -3; ls /opt/bambu/resources/profiles/BBL/filament | grep -i "Bambu PLA Basic @BBL A1" | head -3'
+          docker exec s sh -c 'cd /tmp && /opt/bambu/AppRun --debug 2 --load-settings "/opt/bambu/resources/profiles/BBL/machine/Bambu Lab A1 0.4 nozzle.json;/opt/bambu/resources/profiles/BBL/process/0.20mm Standard @BBL A1.json" --load-filaments "/opt/bambu/resources/profiles/BBL/filament/Bambu PLA Basic @BBL A1.json" --export-3mf /tmp/proj.3mf /tmp/cube.stl 2>&1 | tail -15; ls -la /tmp/proj.3mf'
+          docker cp s:/tmp/proj.3mf proj.3mf && unzip -l proj.3mf | tail -15
+          curl -s -X POST --data-binary @proj.3mf localhost:8080/slice | python3 -c "import json,sys,re; d=json.load(sys.stdin); print({k:v for k,v in d.items() if k!='slice_info'}); print(re.findall(r'key=\"(?:index|prediction|weight)\" value=\"[^\"]*\"|<filament [^>]{0,90}', d.get('slice_info','')))"
+          base64 -w0 proj.3mf | head -c 200; echo; ls -la proj.3mf
+      - name: Logs
+        if: always()
+        run: docker logs s | tail -20; docker stats --no-stream s
