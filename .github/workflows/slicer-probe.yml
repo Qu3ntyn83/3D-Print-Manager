@@ -11,7 +11,7 @@ jobs:
         run: docker build -t slicer-test slicer 2>&1 | tail -15 && docker images slicer-test
       - name: Starten
         run: |
-          docker run -d --name s -p 8080:8080 slicer-test && sleep 3 && docker logs s && curl -s localhost:8080/healthz
+          docker run -d --name slc -p 8080:8080 slicer-test && sleep 3 && docker logs slc && curl -s localhost:8080/healthz
       - name: Echte Projektdatei slicen
         run: |
           curl -sSL -o duck.3mf https://raw.githubusercontent.com/MarcinZukowski/filadeep/HEAD/web/models/duck.3mf
@@ -32,12 +32,12 @@ jobs:
               o.write(b"\0"*80+struct.pack("<I",len(f)))
               for a,b,c in f: o.write(struct.pack("<12fH",0,0,0,*v[a],*v[b],*v[c],0))
           PY
-          docker cp cube.stl s:/tmp/cube.stl
-          docker exec s sh -c 'ls /opt/bambu/resources/profiles/BBL/ | head; ls /opt/bambu/resources/profiles/BBL/machine | grep -i "A1 0.4" | head -3; ls /opt/bambu/resources/profiles/BBL/process | grep -i "0.20mm Standard @BBL A1" | head -3; ls /opt/bambu/resources/profiles/BBL/filament | grep -i "Bambu PLA Basic @BBL A1" | head -3'
-          docker exec s sh -c 'cd /tmp && /opt/bambu/AppRun --debug 2 --load-settings "/opt/bambu/resources/profiles/BBL/machine/Bambu Lab A1 0.4 nozzle.json;/opt/bambu/resources/profiles/BBL/process/0.20mm Standard @BBL A1.json" --load-filaments "/opt/bambu/resources/profiles/BBL/filament/Bambu PLA Basic @BBL A1.json" --export-3mf /tmp/proj.3mf /tmp/cube.stl 2>&1 | tail -15; ls -la /tmp/proj.3mf'
-          docker cp s:/tmp/proj.3mf proj.3mf && unzip -l proj.3mf | tail -15
+          docker cp cube.stl slc:/tmp/cube.stl
+          docker exec slc sh -c 'ls /opt/bambu/resources/profiles/BBL/ | head; ls /opt/bambu/resources/profiles/BBL/machine | grep -i "A1 0.4" | head -3; ls /opt/bambu/resources/profiles/BBL/process | grep -i "0.20mm Standard @BBL A1" | head -3; ls /opt/bambu/resources/profiles/BBL/filament | grep -i "Bambu PLA Basic @BBL A1" | head -3'
+          docker exec slc sh -c 'cd /tmp && /opt/bambu/AppRun --debug 2 --load-settings "/opt/bambu/resources/profiles/BBL/machine/Bambu Lab A1 0.4 nozzle.json;/opt/bambu/resources/profiles/BBL/process/0.20mm Standard @BBL A1.json" --load-filaments "/opt/bambu/resources/profiles/BBL/filament/Bambu PLA Basic @BBL A1.json" --export-3mf /tmp/proj.3mf /tmp/cube.stl 2>&1 | tail -15; ls -la /tmp/proj.3mf'
+          docker cp slc:/tmp/proj.3mf proj.3mf && unzip -l proj.3mf | tail -15
           curl -s -X POST --data-binary @proj.3mf localhost:8080/slice | python3 -c "import json,sys,re; d=json.load(sys.stdin); print({k:v for k,v in d.items() if k!='slice_info'}); print(re.findall(r'key=\"(?:index|prediction|weight)\" value=\"[^\"]*\"|<filament [^>]{0,90}', d.get('slice_info','')))"
           base64 -w0 proj.3mf | head -c 200; echo; ls -la proj.3mf
       - name: Logs
         if: always()
-        run: docker logs s | tail -20; docker stats --no-stream s
+        run: docker logs slc | tail -20; docker stats --no-stream slc
