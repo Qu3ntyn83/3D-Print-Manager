@@ -50,6 +50,7 @@ Jeder Bereich merkt sich die zuletzt offene Unterseite; erneutes Tippen auf den 
 
 **Kalkulation & Angebote** (aus dem [3D Print Calculator](https://github.com/Qu3ntyn83/3D-Print-Calculator))
 - Druckkosten aus einer **3MF der Bibliothek** („Kalkulieren“ direkt am Modell), per Upload oder **ganz ohne 3MF** mit beliebig vielen Druckplatten
+- **Alle Platten des Projekts** mit Namen; Druckzeit und Filament je Platte aus der Datei, aus dem **MakerWorld-Druckprofil** oder per Knopfdruck vom **Slicer-Dienst** (siehe [3MF und Druckzeiten](#3mf-und-druckzeiten)) – fehlende Werte werden klar angezeigt statt stillschweigend mit 0 gerechnet
 - **Filamentpreise und Bestand aus dem Inventar**: Preis je kg aus den einzelnen Spulen, Warnung bei knappem Bestand oder fehlendem Preis; Filamente aus der 3MF werden nach Material und Farbe zugeordnet
 - **Drucker aus dem Bambu-Konto** automatisch, weitere Drucker manuell – je Drucker Kaufpreis, Lebensdauer, Ø Leistung und Verschleiß
 - Aufschlüsselung (Material, Strom, Maschine, Verschleiß, Arbeitszeit, Zubehör, Fehldruck-Risiko), **Mengenstaffel**, Preisprofile, Marge, MwSt oder Kleinunternehmer (§ 19 UStG), Rundung, 14 Währungen
@@ -131,6 +132,32 @@ docker compose pull && docker compose up -d    # bzw. docker compose up -d --bui
 
 Neue Datenbankfelder werden beim Start automatisch angelegt; vorhandene Daten bleiben erhalten. Beim ersten Start mit Spulen-Verwaltung werden aus der Stückzahl automatisch einzelne Spulen erzeugt.
 
+## 3MF und Druckzeiten
+
+Eine 3MF aus Bambu Studio enthält Druckzeit und Filamentgewicht **nur für Platten, die vor dem Speichern geslict wurden**. Normale Projektdateien („Speichern“) und fast alle MakerWorld-Downloads enthalten sie nicht. Die Kalkulation zeigt immer alle Platten und nennt je Platte die Quelle der Werte:
+
+| Quelle | Wann |
+|---|---|
+| **aus der 3MF (geslict)** | Platte war beim Speichern geslict, oder exportiert über „Platte slicen → Export plate sliced file“ (`.gcode.3mf`) |
+| **MakerWorld-Druckprofil** | Modell liegt in der Bibliothek und stammt von MakerWorld – Bambu nennt Zeit und Gramm je Platte im Profil (ohne Anmeldung) |
+| **mit Bambu Studio geslict** | der Slicer-Dienst hat das Projekt berechnet – Ergebnis wird je Datei gemerkt |
+| **von Hand** | Zeit und Gramm eintragen |
+
+### Slicer-Dienst (optional)
+
+Ein zweiter Container mit Bambu Studio auf der Kommandozeile. Er slict 3MF-Projekte mit den **Einstellungen aus der Datei** (Drucker, Profil, Filamente) und liefert Druckzeit und Gramm je Platte – in der Kalkulation erscheint dann der Knopf **„Jetzt slicen“**.
+
+```bash
+docker compose --profile slicer up -d          # fertiges Image; oder mit --build selbst bauen
+echo COMPOSE_PROFILES=slicer >> .env           # damit er bei jedem „docker compose up -d“ mitstartet
+```
+
+- ca. 1,2 GB, **nur amd64** (Bambu Studio gibt es für Linux nicht als ARM-Version)
+- nur im internen Docker-Netz erreichbar (`http://slicer:8080`), kein Port nach außen; anderer Ort: `SLICER_URL=…` beim 3D Print Manager
+- ein Projekt nach dem anderen; kleine Modelle dauern Sekunden, große Mehrplatten-Projekte einige Minuten (`SLICE_TIMEOUT`)
+- Die Druckzeit gilt für den **Drucker aus der Datei** – ein Profil für den A1 mini ergibt andere Zeiten als dein H2S
+- Prüfen: `bash slicer/smoke-test.sh` (erzeugt einen Würfel und lässt ihn slicen)
+
 ## Drucker verbinden
 
 **Drucker → Einrichten → + Drucker**
@@ -208,6 +235,9 @@ Handy-Browser können Bambu-Tags (MIFARE Classic) nicht lesen. Dafür gibt es di
 | GET | `/api/library/tags`, `/api/library/collections` | Tags, Sammlungen |
 | GET/POST | `/api/library/cleanup` | Bibliothek prüfen / bereinigen (`{"duplicates": true}` entfernt auch Duplikate) |
 | POST | `/api/makerworld/sync`, `/api/makerworld/import` | MakerWorld synchronisieren / Link übernehmen |
+| POST | `/api/calc/3mf` | 3MF auswerten (multipart `file`): alle Platten mit Zeit, Gramm, Filamenten und Quelle |
+| GET | `/api/calc/3mf/library/<datei-id>` | dasselbe für eine Datei der Bibliothek |
+| POST/GET | `/api/calc/3mf/slice`, `/api/calc/3mf/slice/<job>` | fehlende Platten vom Slicer-Dienst berechnen lassen / Stand abfragen |
 | GET | `/api/export`, `/api/export.csv?kind=filaments` | Backup / CSV |
 
 Damit lassen sich z. B. in Home Assistant per `rest`-Sensor Bestand, AMS-Belegung und Druckerstatus anzeigen.
@@ -231,10 +261,13 @@ app/
   meshthumb.py        STL/3MF auswerten, Vorschaubilder rendern
   makerworld.py       MakerWorld-Sammlungen synchronisieren, 3MF laden
   calc.py             Kalkulation & Angebote: Druckerkosten, Preisprofile, Angebotsdaten
+  threemf.py          3MF-Projekte auswerten: alle Platten, Zeit/Gramm/Filamente je Platte mit Quelle
+  calc3mf.py          3MF in die Kalkulation laden: Datei, MakerWorld-Profil, Slicer-Dienst
   catalog_fetch.py    Bambu-Farbkatalog laden
   catalog/            Farbkataloge (Bambu, Community)
   hms/                HMS-Fehlertexte (de/en)
   static/             Oberfläche, PWA
+slicer/               optionaler Slicer-Dienst (Bambu Studio CLI + kleine HTTP-Schnittstelle)
 tests/                pytest (läuft in GitHub Actions)
 ```
 

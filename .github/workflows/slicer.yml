@@ -1,0 +1,39 @@
+name: Slicer-Image
+
+# Optionaler Slicer-Dienst (Bambu Studio CLI). Wird nur gebaut, wenn sich slicer/ ändert – das Image ist groß.
+on:
+  push:
+    branches: [main]
+    paths: ["slicer/**", ".github/workflows/slicer.yml"]
+  pull_request:
+    paths: ["slicer/**", ".github/workflows/slicer.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bauen
+        run: docker build -t ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/3d-print-manager-slicer:latest slicer
+      - name: Testen (echtes Slicen)
+        run: |
+          docker run -d --name 3d-manager-slicer -p 8080:8080 ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/3d-print-manager-slicer:latest
+          for i in $(seq 1 30); do curl -fs localhost:8080/healthz >/dev/null && break; sleep 1; done
+          bash slicer/smoke-test.sh 3d-manager-slicer http://127.0.0.1:8080
+      - name: Logs
+        if: failure()
+        run: docker logs 3d-manager-slicer | tail -40
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Veröffentlichen
+        if: github.event_name != 'pull_request'
+        run: docker push ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/3d-print-manager-slicer:latest

@@ -303,10 +303,12 @@
 
           <div class="panel">
             <div class="cx-h"><h3>Druckplatte</h3><span class="muted small" id="cxPlateSrc">manuelle Eingabe</span></div>
+            <div class="cx-notes" id="cxNotice" hidden></div>
             <div class="cx-plates" id="cxPlates"></div>
+            <label class="cx-use" id="cxUseWrap" hidden><input type="checkbox" id="cxUse"> Diese Platte mitrechnen <span class="muted small">– Varianten oder Vorschau-Platten abwählen statt löschen</span></label>
             <div class="cx-form">
               <label>Druckzeit<span class="cx-unit"><input type="number" id="cxH" min="0" step="0.05"><em>h</em></span></label>
-              <label>Teile / Platte<input type="number" id="cxPpp" min="1" step="1"></label>
+              <label title="Liegt das fertige Teil mehrfach auf der Platte, hier die Anzahl eintragen – Zeit und Material werden dann je Teil geteilt">Stück je Platte<input type="number" id="cxPpp" min="1" step="1"></label>
               <label>Spülmaterial<span class="cx-unit"><input type="number" id="cxPurge" min="0" step="1"><em>g</em></span></label>
               <label>Drucker<select id="cxPrinter"></select></label>
             </div>

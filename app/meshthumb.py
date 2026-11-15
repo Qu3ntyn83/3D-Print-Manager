@@ -123,41 +123,6 @@ def _kv(el):
     return {m.get("key"): m.get("value") for m in el if m.tag == "metadata" and m.get("key")}
 
 
-def _attr(tag: str, name: str):
-    m = re.search(rf'\b{name}="([^"]*)"', tag)
-    return m.group(1) if m else None
-
-
-def _slice_info(text: str) -> list:
-    """slice_info.config per Regex – ein unmaskiertes Zeichen in einem Objektnamen darf nicht alles kippen."""
-    out = []
-    for i, m in enumerate(re.finditer(r"<plate>(.*?)</plate>", text, re.S), 1):
-        body = m.group(1)
-        kv = {_attr(t, "key"): _attr(t, "value") for t in re.findall(r"<metadata\b[^>]*>", body)}
-        fil = [{"type": _attr(t, "type"), "color": _attr(t, "color"), "g": float(_attr(t, "used_g") or 0)}
-               for t in re.findall(r"<filament\b[^>]*>", body)]
-        out.append({"index": int(kv.get("index") or i), "seconds": int(float(kv.get("prediction") or 0)) or None,
-                    "grams": round(float(kv.get("weight") or 0), 1) or None, "filaments": fil})
-    return out
-
-
-def _gcode_head(z, name: str) -> dict:
-    """Druckzeit und Filamentgewicht aus den Kommentaren einer Bambu/Orca-G-Code-Datei."""
-    with z.open(name) as f:
-        head = f.read(65536).decode("utf-8", "ignore")
-    secs = 0
-    m = (re.search(r";\s*total estimated time\s*[:=]\s*([^;\n]+)", head, re.I)
-         or re.search(r";\s*(?:model printing time|estimated printing time \(normal mode\))\s*[:=]\s*([^;\n]+)", head, re.I))
-    if m:
-        for v, u in re.findall(r"(\d+(?:\.\d+)?)\s*([dhms])", m.group(1)):
-            secs += float(v) * {"d": 86400, "h": 3600, "m": 60, "s": 1}[u]
-    g = (re.search(r";\s*total filament weight \[g\]\s*:\s*([^\n]+)", head, re.I)
-         or re.search(r";\s*filament used \[g\]\s*=\s*([^\n]+)", head, re.I))
-    grams = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", g.group(1))] if g else []
-    return {"index": int(re.search(r"\d+", name.rsplit("/", 1)[-1]).group()), "seconds": int(secs) or None,
-            "grams": round(sum(grams), 1) or None, "filaments": [{"type": None, "color": None, "g": x} for x in grams if x > 0]}
-
-
 def threemf_info(data: bytes) -> dict:
     """Titel, Designer, Platten, Druckzeit/Gewicht (falls gesliced), Filamente, eingebettete Vorschau."""
     info: dict = {"plates": [], "filaments": []}
@@ -171,25 +136,6 @@ def threemf_info(data: bytes) -> dict:
                 m = re.search(rf'<metadata name="{key}"[^>]*>(.*?)</metadata>', head, re.S)
                 if m and m.group(1).strip():
                     info[key.lower()] = re.sub(r"<[^>]+>", "", m.group(1)).strip()[:4000]
-        # gesliced: Druckzeit, Gewicht, Filamente je Platte
-        if "Metadata/slice_info.config" in names:
-            info["plates"] = _slice_info(z.read("Metadata/slice_info.config").decode("utf-8", "replace"))
-        if not any(p.get("seconds") for p in info["plates"]):
-            # slice_info fehlt/leer → Kopf der G-Code-Dateien je Platte
-            gp = sorted((n for n in names if re.fullmatch(r"Metadata/plate_\d+\.gcode", n)), key=lambda n: int(re.search(r"\d+", n).group()))
-            fromg = [_gcode_head(z, n) for n in gp]
-            if any(p["seconds"] for p in fromg):
-                info["plates"] = fromg
-        info["sliced"] = any(p.get("seconds") for p in info["plates"])
-        # Plattennamen (Projektdatei)
-        if "Metadata/model_settings.config" in names and not info["plates"]:
-            try:
-                root = ET.fromstring(z.read("Metadata/model_settings.config"))
-            except ET.ParseError:
-                root = ET.fromstring("<config/>")
-            for i, pl in enumerate(root.iter("plate"), 1):
-                kv = _kv(pl)
-                info["plates"].append({"index": int(kv.get("plater_id") or i), "name": kv.get("plater_name") or None})
         # Filamente des Projekts
         if "Metadata/project_settings.config" in names:
             try:
@@ -205,6 +151,16 @@ def threemf_info(data: bytes) -> dict:
                 info["_thumb"] = z.read(t)
                 break
         info["has_gcode"] = any(n.endswith(".gcode") for n in names)
+    # Platten: eine Auswertung für Bibliothek und Kalkulation (alle Platten, auch ungeslicte)
+    import threemf
+    try:
+        r = threemf.read(io.BytesIO(data))
+        info["plates"] = [{**p, "seconds": p["seconds"] or None, "grams": p["grams"] or None} for p in r["plates"]]
+        if r["mw"]:
+            info["mw"] = r["mw"]
+    except Exception:  # noqa: BLE001 – Metadaten sind optional
+        info["plates"] = []
+    info["sliced"] = any(p.get("seconds") for p in info["plates"])
     return info
 
 

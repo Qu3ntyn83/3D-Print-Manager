@@ -1021,6 +1021,25 @@ label.file-btn.primary { background: var(--grad); color: var(--accent-ink); bord
 .cx-plates:empty { display: none; }
 .cx-plates button { font: 12px var(--f-mono); padding: 4px 10px; }
 .cx-plates button.active { border-color: var(--accent); background: var(--panel-2); }
+.cx-plates button.open { border-style: dashed; border-color: color-mix(in srgb, var(--warn) 60%, var(--line)); color: var(--warn); }
+.cx-plates button.skip { opacity: .5; text-decoration: line-through; }
+#tab-calc label.cx-use { display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 0 0 12px; font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--text); cursor: pointer; text-align: left; }
+#tab-calc label.cx-use[hidden] { display: none; }
+#tab-calc label.cx-use input { width: auto; flex: none; margin: 0; }
+.cx-notes { display: grid; gap: 8px; margin-bottom: 12px; }
+.cx-notes[hidden] { display: none; }
+.cx-note { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); font-size: 13px; }
+.cx-note.warn { border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); }
+.cx-note.run { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.cx-note > div { display: grid; gap: 3px; min-width: 0; flex: 1; }
+.cx-note span { color: var(--muted); line-height: 1.45; }
+.cx-note .cx-err { color: var(--danger); overflow-wrap: anywhere; }
+.cx-note button { flex: none; }
+.cx-spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: cxspin .9s linear infinite; flex: none; }
+@keyframes cxspin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .cx-spin { animation-duration: 3s; } }
+@media (max-width: 640px) { .cx-note { flex-direction: column; align-items: stretch; } }
 .cx-plates { align-items: center; }
 .cx-plates .cx-scope { flex-basis: 100%; width: max-content; max-width: 100%; margin-bottom: 4px; }
 .cx-plates .cx-scope button { font: 12.5px var(--f-body, inherit); padding: 6px 12px; border: 0; }
