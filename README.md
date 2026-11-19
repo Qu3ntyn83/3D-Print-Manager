@@ -13,7 +13,7 @@ Selbst gehostete Web-App für den 3D-Druck im Homelab: **Filament-, Material- un
 | Bereich | Unterseiten |
 |---|---|
 | Übersicht | Übersicht · Statistik |
-| Drucker | Status · AMS · RFID · Cloud · Einrichten |
+| Drucker | Status · AMS · RFID · Cloud · Wartung · Einrichten |
 | Filament | – |
 | Lager | Zubehör · Material |
 | Projekte | Bibliothek · Kalkulation |
@@ -132,6 +132,17 @@ docker compose pull && docker compose up -d    # bzw. docker compose up -d --bui
 
 Neue Datenbankfelder werden beim Start automatisch angelegt; vorhandene Daten bleiben erhalten. Beim ersten Start mit Spulen-Verwaltung werden aus der Stückzahl automatisch einzelne Spulen erzeugt.
 
+## Wartung
+
+Unter **Drucker → Wartung** stehen je Drucker die Wartungsaufgaben aus dem Bambu-Lab-Wiki für die jeweilige Modellreihe (X1, P1, A1, A1 mini, H2D, H2S) mit Fälligkeit:
+
+- fällig nach **Zeit** (z. B. X-Achse monatlich), **verbrauchtem Filament** (Schneidmesser alle 3–5 Rollen, Cold Pull alle 5 Rollen – abrasives CF/GF-Filament zählt stärker) oder **Druckstunden** (eigene Aufgaben)
+- gezählt aus der Druckhistorie des Druckers; neue Aufgaben zählen ab dem ersten Anzeigen, schon Erledigtes lässt sich mit Datum nachtragen
+- **Erledigt** mit Datum und Notiz → Protokoll je Drucker; Intervalle anpassen, Aufgaben ausschalten, **eigene Aufgaben** anlegen
+- fällige Aufgaben erscheinen als Zahl am Menüpunkt und in der Übersicht
+
+Die Intervalle sind Richtwerte von Bambu Lab für normale Nutzung – bei Dauerbetrieb oder viel ABS/ASA/CF lieber kürzer einstellen.
+
 ## 3MF und Druckzeiten
 
 Eine 3MF aus Bambu Studio enthält Druckzeit und Filamentgewicht **nur für Platten, die vor dem Speichern geslict wurden**. Normale Projektdateien („Speichern“) und fast alle MakerWorld-Downloads enthalten sie nicht. Die Kalkulation zeigt immer alle Platten und nennt je Platte die Quelle der Werte:
@@ -235,6 +246,8 @@ Handy-Browser können Bambu-Tags (MIFARE Classic) nicht lesen. Dafür gibt es di
 | GET | `/api/library/tags`, `/api/library/collections` | Tags, Sammlungen |
 | GET/POST | `/api/library/cleanup` | Bibliothek prüfen / bereinigen (`{"duplicates": true}` entfernt auch Duplikate) |
 | POST | `/api/makerworld/sync`, `/api/makerworld/import` | MakerWorld synchronisieren / Link übernehmen |
+| GET | `/api/maintenance` | Wartung: Aufgaben je Drucker mit Status (`ok`, `soon`, `due`, `off`), Fälligkeit und Zählerständen |
+| POST | `/api/maintenance/<drucker>/<aufgabe>/done` | als erledigt eintragen (`{"date", "note"}`) |
 | POST | `/api/calc/3mf` | 3MF auswerten (multipart `file`): alle Platten mit Zeit, Gramm, Filamenten und Quelle |
 | GET | `/api/calc/3mf/library/<datei-id>` | dasselbe für eine Datei der Bibliothek |
 | POST/GET | `/api/calc/3mf/slice`, `/api/calc/3mf/slice/<job>` | fehlende Platten vom Slicer-Dienst berechnen lassen / Stand abfragen |
@@ -263,6 +276,7 @@ app/
   calc.py             Kalkulation & Angebote: Druckerkosten, Preisprofile, Angebotsdaten
   threemf.py          3MF-Projekte auswerten: alle Platten, Zeit/Gramm/Filamente je Platte mit Quelle
   calc3mf.py          3MF in die Kalkulation laden: Datei, MakerWorld-Profil, Slicer-Dienst
+  maintenance.py      Wartung: Aufgaben je Modellreihe, Fälligkeit nach Zeit/Filament/Druckstunden
   catalog_fetch.py    Bambu-Farbkatalog laden
   catalog/            Farbkataloge (Bambu, Community)
   hms/                HMS-Fehlertexte (de/en)

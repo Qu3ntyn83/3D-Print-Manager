@@ -234,7 +234,7 @@ def test_js_globals_unique():
     import re
     from pathlib import Path
     seen = {}
-    for name in ("app.js", "extras.js", "stats.js", "library.js"):
+    for name in ("app.js", "extras.js", "stats.js", "library.js", "calc.js", "maint.js"):
         src = (Path(__file__).resolve().parents[1] / "app" / "static" / name).read_text(encoding="utf-8")
         for m in re.finditer(r"^(?:const|let|function|async function|class) ([A-Za-z_$][\w$]*)", src, re.M):
             assert m.group(1) not in seen, f"{m.group(1)} doppelt in {seen.get(m.group(1))} und {name}"

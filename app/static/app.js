@@ -782,7 +782,7 @@ async function load() {
 
 /* ---------- Tabs / Toolbar ---------- */
 /* Hauptmenü: 5 Bereiche, Unterseiten in der Leiste darunter. Ein Bereich merkt sich die zuletzt offene Unterseite. */
-var TAB_GROUP = { overview: "overview", stats: "overview", printer: "printer", bambu: "printer", filaments: "filaments",
+var TAB_GROUP = { overview: "overview", stats: "overview", printer: "printer", bambu: "printer", maint: "printer", filaments: "filaments",
   accessories: "stock", materials: "stock", library: "projects", calc: "projects" };
 function goKey(t) { return t === "bambu" ? "bambu:" + (state.sub || "ams") : t; }
 function markGroup() {
@@ -807,6 +807,7 @@ function setTab(t) {
   if (t === "library" && typeof libLoad === "function") libLoad().catch(e => toast("Bibliothek: " + e.message));
   if (t === "stats" && typeof loadStats === "function") loadStats().catch(e => toast("Statistik: " + e.message));
   if (t === "calc" && typeof loadCalc === "function") loadCalc().catch(e => toast("Kalkulation: " + e.message));
+  if (t === "maint" && typeof loadMaint === "function") loadMaint().catch(e => toast("Wartung: " + e.message));
   if (t === "printer") { loadStatus().catch(() => {}); loadJobs().catch(() => {}); if (!state.live.length) loadAms().catch(() => {}); }
 }
 $$(".tabs button").forEach(b => b.onclick = () => {
