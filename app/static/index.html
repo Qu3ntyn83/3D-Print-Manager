@@ -75,7 +75,7 @@
 <main>
   <div class="groupnav" id="groupNav">
     <div class="seg" role="tablist" data-g="overview"><button data-go="overview">Übersicht</button><button data-go="stats">Statistik</button></div>
-    <div class="seg" role="tablist" data-g="printer"><button data-go="printer">Status</button><button data-go="bambu:ams">AMS</button><button data-go="bambu:tags">RFID <b id="tagsOpen"></b></button><button data-go="bambu:cloud">Cloud</button><button data-go="bambu:setup">Einrichten</button></div>
+    <div class="seg" role="tablist" data-g="printer"><button data-go="printer">Status</button><button data-go="bambu:ams">AMS</button><button data-go="bambu:tags">RFID <b id="tagsOpen"></b></button><button data-go="bambu:cloud">Cloud</button><button data-go="maint">Wartung <b id="maintDue"></b></button><button data-go="bambu:setup">Einrichten</button></div>
     <div class="seg" role="tablist" data-g="stock"><button data-go="accessories">Zubehör</button><button data-go="materials">Material</button></div>
     <div class="seg" role="tablist" data-g="projects"><button data-go="library">Bibliothek</button><button data-go="calc">Kalkulation</button></div>
   </div>
@@ -252,6 +252,13 @@
 
   <!-- MATERIAL -->
   <!-- BIBLIOTHEK -->
+  <!-- WARTUNG -->
+  <section id="tab-maint" class="tab" hidden>
+    <p class="muted mt-intro">Aufgaben und Intervalle nach den Wartungsempfehlungen von Bambu Lab. Gezählt werden Zeit, verbrauchtes Filament (1 Rolle = 1 kg, CF/GF zählt beim Verschleiß stärker) und Druckstunden aus der Druckhistorie. Neue Aufgaben zählen ab dem ersten Anzeigen – schon Erledigtes über ⋯ nachtragen.</p>
+    <div id="mtList"><p class="muted">lädt …</p></div>
+  </section>
+  <dialog id="mtDlg"><form id="mtForm" method="dialog"></form></dialog>
+
   <section id="tab-library" class="tab" hidden>
     <div class="toolbar lib-toolbar">
       <input type="search" id="libQ" placeholder="Suchen: Titel, Tag, Designer, Dateiname …" autocomplete="off">
@@ -854,5 +861,6 @@
 <script src="/static/stats.js"></script>
 <script src="/static/library.js"></script>
 <script src="/static/calc.js"></script>
+<script src="/static/maint.js"></script>
 </body>
 </html>

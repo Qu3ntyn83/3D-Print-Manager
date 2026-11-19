@@ -204,8 +204,8 @@ $("#jobBody").addEventListener("click", e => {
 
 /* ---------- Übersicht ---------- */
 async function loadOverview() {
-  const [st, shop, dry] = await Promise.all([api("/api/stats"), api("/api/shopping"), api("/api/drying")]);
-  state.drying = dry;
+  const [st, shop, dry, mt] = await Promise.all([api("/api/stats"), api("/api/shopping"), api("/api/drying"), api("/api/maintenance").catch(() => null)]);
+  state.drying = dry; state.maint = mt;
   renderKpis(st); renderShop(shop); renderDry(dry); renderMonths(st); renderMatStats(st); renderTop(st); renderForecast(st);
 }
 function renderKpis(st) {
@@ -218,6 +218,8 @@ function renderKpis(st) {
     tile(fmtG(k.used_30d_g), "Verbrauch 30 Tage"),
     tile(fmtMoney(k.cost_30d), "Kosten 30 Tage (inkl. Strom)"),
     tile(`${k.jobs_30d}`, "Drucke 30 Tage"),
+    state.maint && state.maint.printers.length ? `<button type="button" class="kpi kpi-link ${state.maint.due ? "bad" : ""}" onclick="go('maint')" title="Zur Wartung">
+      <b>${state.maint.due ? state.maint.due + " fällig" : state.maint.soon ? state.maint.soon + " bald" : "✓"}</b><span>Wartung der Drucker</span></button>` : "",
   ].join("");
 }
 function renderShop(items) {

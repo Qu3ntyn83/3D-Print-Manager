@@ -537,6 +537,7 @@ import library  # noqa: E402
 import makerworld  # noqa: E402
 import calc  # noqa: E402
 import calc3mf  # noqa: E402
+import maintenance  # noqa: E402
 from bambu import ensure_catalog  # noqa: E402
 
 app.register_blueprint(bambu_bp)
@@ -552,6 +553,7 @@ app.register_blueprint(library.bp)
 app.register_blueprint(makerworld.bp)
 app.register_blueprint(calc.bp)
 app.register_blueprint(calc3mf.bp)
+app.register_blueprint(maintenance.bp)
 init_db()
 start_ams(app)
 units.init_schema()
@@ -560,6 +562,7 @@ studio.init_schema()
 library.init_schema()
 calc.init_schema()
 calc3mf.init_schema()
+maintenance.init_schema()
 library.worker()
 makerworld.scheduler()
 ensure_catalog(app)
