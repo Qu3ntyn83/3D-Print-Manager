@@ -18,6 +18,8 @@ Schlüsselableitung und Blockformat der Bambu-RFID-Tags (`android/…/BambuTag.j
 
 Die MakerWorld-Anbindung (Sammlungen, Modell-Details, signierter 3MF-Download über `api.bambulab.com`) orientiert sich an [OpenBambuAPI](https://github.com/Doridian/OpenBambuAPI/blob/main/cloud-makerworld.md) und [Bambuddy](https://github.com/maziggy/bambuddy). MakerWorld-Inhalte unterliegen den Lizenzen der jeweiligen Designer.
 
+Der optionale Slicer-Dienst (`slicer/`) lädt beim Bauen das unveränderte offizielle [Bambu Studio](https://github.com/bambulab/BambuStudio) (AGPL-3.0, Quelltext unter dem Link) und ruft es als eigenständiges Programm auf der Kommandozeile auf. Es ist nicht Teil des 3D Print Manager; beide sprechen nur über HTTP miteinander.
+
 Die Kommunikation mit der Bambu-Cloud und dem Drucker (MQTT) orientiert sich an der Dokumentation und dem Code von [ha-bambulab](https://github.com/greghesp/ha-bambulab), [ha-bambu-filaments](https://github.com/Timmes123/ha-bambu-filaments) und [OpenBambuAPI](https://github.com/Doridian/OpenBambuAPI).
 
 „Bambu Lab“, „Bambu Studio“ und „AMS“ sind Marken von Bambu Lab. Dieses Projekt ist nicht mit Bambu Lab verbunden.

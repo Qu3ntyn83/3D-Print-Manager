@@ -514,42 +514,40 @@ def profiles(mid):
     return jsonify({"ok": True, "profiles": out})
 
 
-@bp.get("/plates-for-file")
-def plates_for_file():
-    """MakerWorld-3MF ohne Slice-Daten direkt geöffnet: über DesignModelId/DesignProfileId aus der Datei
-    das passende Bibliotheksmodell finden und dessen Druckprofil-Platten liefern."""
-    model_id = (request.args.get("model_id") or "").strip()
-    profile_id = request.args.get("profile_id", type=int)
+def profile_plates(mid: int, profile_id: int | None = None, live=True) -> dict:
+    """Platten des Druckprofils eines Bibliotheksmodells: Zeit, Gramm, Filamente je Platte.
+
+    profile_id: Profil, aus dem die Datei stammt (DesignProfileId in der 3MF) – sonst das gewählte bzw. passendste.
+    live=False nutzt nur den gespeicherten Stand. → {"plates": [...], "profile": Titel, "error": Text oder None}"""
     with conn() as c:
-        m = None
-        if model_id:
-            m = c.execute("SELECT id, mw_profile_id FROM lib_models WHERE mw_model_id=?", (model_id,)).fetchone()
-        if not m and profile_id:
-            m = c.execute("SELECT id, mw_profile_id FROM lib_models WHERE mw_profile_id=?", (profile_id,)).fetchone()
-        if not m:
-            return jsonify({"ok": False, "error": "Modell nicht in der Bibliothek"}), 404
-        if profile_id and profile_id != m["mw_profile_id"]:
-            c.execute("UPDATE lib_models SET mw_profile_id=? WHERE id=?", (profile_id, m["id"]))
-    return plates(m["id"])
+        m = c.execute("SELECT * FROM lib_models WHERE id=?", (mid,)).fetchone()
+    if not m or not m["mw_design_id"]:
+        return {"plates": [], "profile": None, "error": None}
+    cached = json.loads(m["mw_plates"]) if m["mw_plates"] else []
+    same = not profile_id or profile_id == m["mw_profile_id"]
+    if not live:
+        return {"plates": cached if same else [], "profile": m["mw_instance_title"], "error": None}
+    try:
+        d = api_get(client(), f"/v1/design-service/design/{m['mw_design_id']}", auth=False)
+    except MWError as e:
+        return {"plates": cached if same else [], "profile": m["mw_instance_title"], "error": str(e)}
+    with conn() as c:
+        want = profile_id or m["mw_profile_id"]
+        inst = next((i for i in d.get("instances") or [] if want and i.get("profileId") == want), None) or pick_instance(c, d)
+        pl = inst_plates(inst)
+        if same or not m["mw_plates"]:
+            c.execute("UPDATE lib_models SET mw_plates=? WHERE id=?", (json.dumps(pl), mid))
+    return {"plates": pl, "profile": (inst or {}).get("titleTranslated") or (inst or {}).get("title"), "error": None}
 
 
 @bp.get("/plates/<int:mid>")
 def plates(mid):
-    """Platten des gewählten Druckprofils (Zeit, Gramm, Filamente) frisch von MakerWorld – für die Kalkulation."""
+    """Platten des gewählten Druckprofils (Zeit, Gramm, Filamente) frisch von MakerWorld."""
     with conn() as c:
-        m = c.execute("SELECT * FROM lib_models WHERE id=?", (mid,)).fetchone()
-    if not m or not m["mw_design_id"]:
-        abort(404)
-    try:
-        d = api_get(client(), f"/v1/design-service/design/{m['mw_design_id']}", auth=False)
-    except MWError as e:
-        cached = json.loads(m["mw_plates"]) if m["mw_plates"] else []
-        return jsonify({"ok": bool(cached), "plates": cached, "error": str(e)}), (200 if cached else 502)
-    with conn() as c:
-        inst = next((i for i in d.get("instances") or [] if m["mw_profile_id"] and i.get("profileId") == m["mw_profile_id"]), None) or pick_instance(c, d)
-        pl = inst_plates(inst)
-        c.execute("UPDATE lib_models SET mw_plates=? WHERE id=?", (json.dumps(pl), mid))
-    return jsonify({"ok": True, "plates": pl, "profile": (inst or {}).get("titleTranslated") or (inst or {}).get("title")})
+        if not c.execute("SELECT 1 FROM lib_models WHERE id=? AND mw_design_id IS NOT NULL", (mid,)).fetchone():
+            abort(404)
+    r = profile_plates(mid)
+    return jsonify({"ok": bool(r["plates"]), **r}), (200 if r["plates"] or not r["error"] else 502)
 
 
 @bp.post("/download/<int:mid>")

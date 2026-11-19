@@ -28,7 +28,8 @@ const cxSaveJob = () => store.set("cxJob", CX.job);
 const cxPlate = () => CX.job.plates[CX.job.plate] || CX.job.plates[0];
 /* Berechnet wird das komplette Projekt (alle Platten = ein Stück) oder nur die gewählte Platte */
 const cxScope = () => CX.job.plates.length > 1 && CX.job.scope === "plate" ? "plate" : "all";
-const cxCalcPlates = () => cxScope() === "plate" ? [cxPlate()] : CX.job.plates;
+/* Projekte bringen oft Varianten oder Vorschau-Platten mit – abgewählte Platten (skip) zählen bei „Komplett“ nicht mit */
+const cxCalcPlates = () => cxScope() === "plate" ? [cxPlate()] : CX.job.plates.filter(p => !p.skip);
 const cxFil = id => CX.fils.find(f => f.id === id) || null;
 const cxPrinter = () => CX.printers.find(p => p.key === CX.job.printer) || CX.printers[0] || { name: "–", price: 0, life: 5000, watt: 0, wear: 0 };
 const cxProfile = () => CX.cfg.profiles.find(p => p.id === CX.job.profile) || CX.cfg.profiles[0];
@@ -78,6 +79,8 @@ async function cxLoad() {
   const saved = store.get("cxJob", null);
   CX.job = saved && saved.plates && saved.plates.length ? saved : cxNewJob();
   if (!CX.printers.some(p => p.key === CX.job.printer)) CX.job.printer = CX.printers[0] && CX.printers[0].key;
+  for (const p of CX.job.plates) p.ppp = Math.max(1, p.ppp | 0);
+  api("/api/calc/slicer").then(sl => { CX.slicer = sl; if (CX.sub === "calc") cxRenderNotice(); }).catch(() => {});
   cxSetSub(CX.sub);
 }
 function cxSaveCfg() {
@@ -106,14 +109,17 @@ function cxRenderCalc() {
   const j = CX.job, p = cxPlate();
   $("#cxFile").textContent = j.file || "Eigenes Projekt";
   $("#cxMeta").textContent = j.meta || "Werte eintragen oder eine 3MF laden";
-  $("#cxPlateSrc").textContent = { manual: "manuelle Eingabe", library: "aus der Bibliothek", makerworld: "MakerWorld-Druckprofil" }[j.source] || "aus der 3MF";
+  $("#cxPlateSrc").textContent = j.source === "manual" ? "manuelle Eingabe" : CX_SRC[p.src] ? CX_SRC[p.src] + (p.src === "makerworld" && j.info && j.info.profile ? ` „${j.info.profile}“` : "") : cxOpen(p) ? "keine Werte in der Datei" : "von Hand eingetragen";
+  const pl = x => `Platte ${x.n}${x.name ? " · " + esc(x.name) : ""} · ${+x.hours > 0 ? cxNum(x.hours) + " h" : "–"}`;
   const multi = j.plates.length > 1, all = cxScope() === "all";
   $("#cxPlates").innerHTML = (multi ? `<div class="seg mini cx-scope" role="group" aria-label="Berechnen">
-      <button type="button" data-scope="all" class="${all ? "active" : ""}">Komplett · ${j.plates.length} Platten · ${cxNum(j.plates.reduce((a, x) => a + (+x.hours || 0), 0))} h</button>
+      <button type="button" data-scope="all" class="${all ? "active" : ""}">${cxAllLabel()}</button>
       <button type="button" data-scope="plate" class="${all ? "" : "active"}">Nur Platte ${p.n}</button></div>
       <span class="muted small cx-edit">${all ? "Bearbeiten:" : "Platte:"}</span>` : "") +
     (multi || j.source !== "manual" ? j.plates.map((x, i) =>
-      `<button type="button" data-plate="${i}" class="${i === j.plate ? "active" : ""}">Platte ${x.n} · ${cxNum(x.hours)} h</button>`).join("") : "");
+      `<button type="button" data-plate="${i}" class="${i === j.plate ? "active" : ""} ${x.skip ? "skip" : cxOpen(x) ? "open" : ""}" ${x.skip ? 'title="wird nicht mitgerechnet"' : cxOpen(x) ? 'title="Druckzeit oder Filamentmenge fehlt"' : ""}>${pl(x)}</button>`).join("") : "");
+  $("#cxUseWrap").hidden = !multi; $("#cxUse").checked = !p.skip;
+  cxRenderNotice();
   $("#cxH").value = p.hours; $("#cxPpp").value = p.ppp; $("#cxPurge").value = p.purge;
   $("#cxPrinter").innerHTML = CX.printers.map(x => `<option value="${esc(x.key)}" ${x.key === j.printer ? "selected" : ""}>${esc(x.name)}</option>`).join("")
     || `<option value="">Kein Drucker – unter „Drucker & Profile“ anlegen</option>`;
@@ -147,7 +153,8 @@ function cxRenderResult() {
       <div class="cx-side">Gesamt ${q} Stk<strong>${cxMoney(r.total)}</strong></div></div>
     <div class="cx-chips">
       <span class="pill">${st.klein ? "ohne USt (§ 19)" : `inkl. ${st.vat} % MwSt`}</span>
-      ${CX.job.plates.length > 1 ? `<span class="pill">${cxScope() === "all" ? `komplett (${CX.job.plates.length} Platten je Stück)` : `nur Platte ${cxPlate().n}`}</span>` : ""}
+      ${cxCalcPlates().some(cxOpen) ? `<span class="pill bad">Unvollständig: ${cxCalcPlates().filter(cxOpen).map(x => "Platte " + x.n).join(", ")} ohne Zeit oder Filament</span>` : ""}
+      ${CX.job.plates.length > 1 ? `<span class="pill">${cxScope() === "all" ? `komplett (${cxCalcPlates().length} Platten je Stück)` : `nur Platte ${cxPlate().n}`}</span>` : ""}
       <span class="pill">${r.plates} ${r.plates === 1 ? "Platte" : "Platten"} · ${cxNum(r.h, 1)} h</span>
       <span class="pill">${cxNum(r.grams, 0)} g Filament</span>
       ${short.length ? short.map(s => `<span class="pill warn">Bestand knapp: ${esc(s.f.name)} (${cxNum(s.g, 0)} von ${s.f.stock_g} g)</span>`).join("") : `<span class="pill ok">Bestand reicht</span>`}
@@ -253,150 +260,121 @@ function cxMatch(type, color) {
   const dist = f => hex(f.color).reduce((s, v, i) => s + (v - c[i]) ** 2, 0) + (f.stock_g > 0 ? 0 : 1e6);
   return cand.sort((a, b) => dist(a) - dist(b))[0].id;
 }
+/* ---------- 3MF laden ----------
+   Ausgewertet wird auf dem Server (app/threemf.py + app/calc3mf.py) – eine Stelle für Upload und Bibliothek.
+   Die Antwort enthält ALLE Platten des Projekts; jede nennt ihre Quelle (src):
+     slice_info / gcode = stand in der Datei · makerworld = Druckprofil · slicer = Slicer-Dienst · null = keine Werte */
+const CX_SRC = { slice_info: "aus der 3MF (geslict)", gcode: "aus dem G-Code der 3MF", makerworld: "MakerWorld-Druckprofil", slicer: "mit Bambu Studio geslict" };
+const cxOpen = p => !(+p.hours > 0) || !p.lines.some(l => +l.grams > 0);        // Platte ohne Zeit oder ohne Filamentmenge
 function cxPlatesFrom(list) {
-  return list.filter(p => (p.seconds || 0) > 0 || (p.filaments || []).length).map((p, i) => ({
-    n: p.index || i + 1, hours: +((p.seconds || 0) / 3600).toFixed(2), ppp: Math.max(1, p.objects || 1), purge: 0,
-    lines: (p.filaments && p.filaments.some(f => +f.g > 0) ? p.filaments : (+p.grams > 0 ? [{ ...((p.filaments || [])[0] || { id: "1" }), g: +p.grams }] : p.filaments || []))
-      .map((f, k) => ({ slot: "#" + (f.id || k + 1), type: f.type, color: (f.color || "#888888").slice(0, 7), grams: +(+f.g || 0).toFixed(2), fil: cxMatch(f.type, f.color) })),
+  return list.map((p, i) => ({
+    n: p.index || i + 1, name: p.name || "", hours: +((p.seconds || 0) / 3600).toFixed(2), ppp: 1, purge: 0, src: p.src || null,
+    lines: (p.filaments || []).map((f, k) => ({ slot: "#" + (f.id || k + 1), type: f.type, color: (f.color || "#888888").slice(0, 7), grams: +(+f.g || 0).toFixed(2), fil: cxMatch(f.type, f.color) })),
   }));
 }
-function cxUseJob(plates, file, meta, source, title) {
+function cxUseJob(plates, file, meta, source, title, info) {
   const keep = CX.job || cxNewJob();
-  CX.job = { ...keep, file, meta, source, title: title || "", plates, plate: 0, scope: "all" };
+  CX.job = { ...keep, file, meta, source, title: title || "", plates, plate: Math.max(0, plates.findIndex(cxOpen)), scope: "all", info: info || null };
   if (title) { $("#cqTitle").value = title; store.set("cqTitle", title); }
   cxSaveJob(); setTab("calc"); cxSetSub("calc");
 }
-/* 3MF lesen: 1. slice_info.config (Bambu Studio / OrcaSlicer, geslict)
-               2. Kopf von Metadata/plate_N.gcode (falls slice_info fehlt oder nicht lesbar)
-               3. Projektdatei ohne Slicing: Platten + Filamente übernehmen, Zeit/Gramm von Hand */
-const CX_META = n => n === "Metadata/slice_info.config" || n === "Metadata/model_settings.config" || n === "Metadata/project_settings.config";
-function cxAttr(tag, name) { const m = tag.match(new RegExp(`\\b${name}="([^"]*)"`)); return m ? m[1] : null; }
-function cxSliceInfo(text) {
-  // bewusst ohne DOMParser: ein einziges unmaskiertes Zeichen im Objektnamen machte sonst die ganze Datei unlesbar
-  return [...text.matchAll(/<plate>([\s\S]*?)<\/plate>/g)].map((m, i) => {
-    const body = m[1], meta = {};
-    for (const t of body.matchAll(/<metadata\b[^>]*>/g)) { const k = cxAttr(t[0], "key"); if (k) meta[k] = cxAttr(t[0], "value"); }
-    let fil = [...body.matchAll(/<filament\b[^>]*>/g)].map(t => ({ id: cxAttr(t[0], "id"), type: cxAttr(t[0], "type"), color: cxAttr(t[0], "color"),
-      g: +(cxAttr(t[0], "used_g") || cxAttr(t[0], "usedG")) || 0 }));
-    // keine Gramm je Filament, aber Gesamtgewicht der Platte → auf das erste Filament
-    if (!fil.some(f => f.g > 0) && +meta.weight > 0) fil = [{ ...(fil[0] || { id: "1", type: "", color: "#888888" }), g: +meta.weight }];
-    return { index: +(meta.index || i + 1), seconds: Math.round(+meta.prediction || 0), objects: (body.match(/<object\b/g) || []).length, filaments: fil };
-  });
-}
-function cxGcodeHead(text, index, proj) {
-  const hms = s => { let t = 0; for (const [, v, u] of String(s).matchAll(/(\d+(?:\.\d+)?)\s*([dhms])/g)) t += +v * { d: 86400, h: 3600, m: 60, s: 1 }[u]; return t; };
-  const tm = text.match(/;\s*total estimated time\s*[:=]\s*([^;\n]+)/i) || text.match(/;\s*(?:model printing time|estimated printing time \(normal mode\))\s*[:=]\s*([^;\n]+)/i);
-  // Bambu Studio: „; total filament weight [g] : 23.43,8.70“ + „; filament: 1,4“ (genutzte Filament-Nummern)
-  const w = (text.match(/;\s*total filament weight \[g\]\s*:\s*([^\n]+)/i) || text.match(/;\s*filament used \[g\]\s*=\s*([^\n]+)/i) || [])[1];
-  const grams = w ? w.split(/[,;]/).map(x => +x || 0) : [];
-  const ids = ((text.match(/;\s*filament\s*:\s*([\d,\s]+)\n/i) || [])[1] || "").split(",").map(x => +x).filter(Boolean);
-  const types = proj.filament_type || [], cols = proj.filament_colour || [];
-  return { index, seconds: Math.round(tm ? hms(tm[1]) : 0), objects: 0,
-    filaments: grams.map((g, k) => { const id = ids.length === grams.length ? ids[k] : k + 1;
-      return { id: String(id), type: types[id - 1] || "", color: cols[id - 1] || "#888888", g }; }).filter(f => f.g > 0) };
-}
-async function cxRead3mf(buf) {
-  if (typeof fflate === "undefined") await libScript("/static/vendor/three/fflate.min.js");
-  const u8 = new Uint8Array(buf);
-  const meta = fflate.unzipSync(u8, { filter: f => CX_META(f.name) });
-  const txt = n => meta[n] ? fflate.strFromU8(meta[n]) : "";
-  let proj = {}; try { proj = JSON.parse(txt("Metadata/project_settings.config") || "{}"); } catch { /* ältere Formate */ }
-  let list = txt("Metadata/slice_info.config") ? cxSliceInfo(txt("Metadata/slice_info.config")) : [];
-  if (!list.some(p => p.seconds > 0)) {
-    // G-Code-Kopf lesen – nur die ersten 64 KB jeder Platte entpacken wäre ideal, unzipSync entpackt ganz; deshalb einzeln
-    const names = [];
-    fflate.unzipSync(u8, { filter: f => { if (/^Metadata\/plate_\d+\.gcode$/.test(f.name)) names.push(f.name); return false; } });
-    const fromG = [];
-    for (const n of names) {
-      const g = fflate.unzipSync(u8, { filter: f => f.name === n })[n];
-      const head = fflate.strFromU8(g.subarray(0, 65536)) + "\n" + fflate.strFromU8(g.subarray(Math.max(0, g.length - 65536)));
-      fromG.push(cxGcodeHead(head, +n.match(/plate_(\d+)/)[1], proj));
-    }
-    if (fromG.some(p => p.seconds > 0)) list = fromG;
+function cxApply(a, title) {
+  if (a.slicer) CX.slicer = a.slicer;
+  if (!a.plates.length) {
+    return toast(a.kind === "bambu" ? "In dieser 3MF sind keine Druckplatten angelegt" : "Diese 3MF stammt nicht aus Bambu Studio / OrcaSlicer – Werte bitte von Hand eintragen");
   }
-  if (list.some(p => p.seconds > 0)) return { list: list.filter(p => p.seconds > 0 || p.filaments.length), sliced: true };
-  // MakerWorld-Datei? Dann stehen Zeit und Gramm im Druckprofil (Modell muss in der Bibliothek sein)
-  const head = fflate.unzipSync(u8, { filter: f => /^3D\/3dmodel\.model$/i.test(f.name) });
-  const mtxt = Object.values(head)[0] ? fflate.strFromU8(Object.values(head)[0].subarray(0, 200000)) : "";
-  const mdv = k => (mtxt.match(new RegExp(`<metadata name="${k}"[^>]*>([^<]*)<`)) || [])[1] || "";
-  const mwModel = mdv("DesignModelId"), mwProfile = mdv("DesignProfileId");
-  if (mwModel || mwProfile) {
-    try {
-      const r = await api(`/api/makerworld/plates-for-file?model_id=${encodeURIComponent(mwModel)}&profile_id=${encodeURIComponent(mwProfile)}`);
-      const mw = (r.plates || []).filter(p => p.seconds);
-      if (mw.length) return { list: mw, sliced: true, source: "makerworld" };
-    } catch { /* nicht in der Bibliothek → von Hand */ }
+  // bereits gewählte Filamente behalten, wenn dieselbe Datei nur neu ausgewertet wurde (z. B. nach dem Slicen)
+  const old = CX.job && CX.job.info && CX.job.info.token === a.token ? CX.job.plates : [];
+  const plates = cxPlatesFrom(a.plates);
+  for (const p of plates) {
+    const o = old.find(x => x.n === p.n); if (!o) continue;
+    p.ppp = o.ppp; p.purge = o.purge; p.skip = o.skip;
+    for (const l of p.lines) { const ol = o.lines.find(x => x.slot === l.slot); if (ol && ol.fil) l.fil = ol.fil; }
   }
-  // Projekt ohne Slicing: Platten aus model_settings.config, Filamente aus den Projekteinstellungen
-  const ms = txt("Metadata/model_settings.config");
-  const ids = ms ? [...ms.matchAll(/<plate>([\s\S]*?)<\/plate>/g)].map((m, i) => {
-    const id = [...m[1].matchAll(/<metadata\b[^>]*>/g)].map(t => t[0]).find(t => cxAttr(t, "key") === "plater_id");
-    return { index: +(id ? cxAttr(id, "value") : i + 1), objects: (m[1].match(/<model_instance>/g) || []).length };
-  }) : [];
-  const fil = (proj.filament_type || []).map((t, k) => ({ id: String(k + 1), type: t, color: (proj.filament_colour || [])[k] || "#888888", g: 0 }));
-  // welche Filamente eine Platte nutzt, steht erst nach dem Slicen fest → erstes Projektfilament als Vorschlag
-  const plates = (ids.length ? ids : [{ index: 1, objects: 0 }]).map(p => ({ ...p, seconds: 0, filaments: fil.slice(0, 1) }));
-  return { list: plates, sliced: false, hasModel: !!ms || fil.length > 0, mw: !!(mwModel || mwProfile) };
+  const n = plates.length, miss = a.missing.length;
+  const srcs = [...new Set(a.plates.map(p => p.src).filter(Boolean))].map(k => CX_SRC[k]);
+  const meta = `${n} ${n === 1 ? "Druckplatte" : "Druckplatten"}` + (a.printer ? ` · ${a.printer}` : "") +
+    (miss === 0 ? ` · Werte ${srcs.join(" + ")}` : miss === n ? " · ohne Druckzeiten gespeichert" : ` · ${n - miss} mit Werten, ${miss} ohne`);
+  cxUseJob(plates, a.name, meta, "3mf", title || a.title || a.name.replace(/(\.gcode)?\.3mf$/i, "").replace(/[_-]+/g, " "),
+    { token: a.token, notes: a.notes || [], profile: a.mw_profile || "", failed: a.slicer_failed || [], model: a.model });
+  toast(miss === 0 ? `${n} ${n === 1 ? "Platte" : "Platten"} übernommen – Filamentzuordnung bitte prüfen` : miss === n ? "Projekt ohne Druckzeiten – siehe Hinweis" : `${miss} von ${n} Platten ohne Werte – siehe Hinweis`);
 }
 async function cxImportFile(file) {
-  try {
-    const r = await cxRead3mf(await file.arrayBuffer());
-    const title = file.name.replace(/(\.gcode)?\.3mf$/i, "").replace(/[_-]+/g, " ");
-    if (!r.list.length || (!r.sliced && !r.hasModel)) return toast("Keine 3MF von Bambu Studio / OrcaSlicer – Werte bitte von Hand eintragen");
-    const plates = r.sliced ? cxPlatesFrom(r.list) : cxPlatesFrom(r.list.map(p => ({ ...p, filaments: p.filaments.length ? p.filaments : [{ id: "1", type: "", color: "#888888", g: 0 }] })))
-      .map(p => ({ ...p, lines: p.lines.map(l => ({ ...l, grams: l.grams || 0 })) }));
-    const n = `${plates.length} ${plates.length === 1 ? "Druckplatte" : "Druckplatten"}`;
-    cxUseJob(plates, file.name, r.source === "makerworld" ? `${n} · Zeiten und Gramm aus dem MakerWorld-Druckprofil` : r.sliced ? `${n} · Filament automatisch zugeordnet, bitte prüfen`
-      : r.mw ? `${n} · MakerWorld-Datei ohne Slice-Daten – Modell in die Bibliothek übernehmen, dann kommen Zeit und Gramm aus dem Druckprofil`
-      : `${n} · nicht geslict – Druckzeit und Gramm je Platte eintragen (oder in Bambu Studio „Platte slicen“ und als .gcode.3mf exportieren)`, r.source || "upload", title);
-    toast(r.source === "makerworld" ? "Werte aus dem MakerWorld-Druckprofil übernommen" : r.sliced ? "3MF importiert" : "Projekt ohne Slice-Daten übernommen – Zeit und Gramm bitte eintragen");
-  } catch (e) { toast("Datei konnte nicht gelesen werden: " + e.message); }
+  if (!/\.3mf$/i.test(file.name)) return toast("Bitte eine .3mf-Datei wählen");
+  const fd = new FormData(); fd.append("file", file);
+  $("#cxMeta").textContent = "wird hochgeladen und ausgewertet …";
+  try { cxApply(await api("/api/calc/3mf", { method: "POST", body: fd })); }
+  catch (e) { cxRenderCalc(); toast("3MF: " + e.message); }
 }
 async function cxFromLibraryFile(model, file) {
   if (!CX.cfg) await cxLoad();
-  let plates = cxPlatesFrom(((file.meta && file.meta.plates) || []).filter(p => p.seconds));
-  if (!plates.length && model.mw_design_id) {
-    // MakerWorld-Projektdateien sind nicht geslict – Bambu nennt Zeit und Gramm je Platte aber im Druckprofil
-    let mw = (model.mw_plates || []).filter(p => p.seconds);
-    if (!mw.length) { try { mw = ((await api(`/api/makerworld/plates/${model.id}`)).plates || []).filter(p => p.seconds); } catch { mw = []; } }
-    if (mw.length) {
-      plates = cxPlatesFrom(mw);
-      cxUseJob(plates, file.name, `${model.title} · ${plates.length} ${plates.length === 1 ? "Druckplatte" : "Druckplatten"} · Zeiten und Gramm aus dem MakerWorld-Druckprofil`, "makerworld", model.title);
-      return toast("Werte aus dem MakerWorld-Druckprofil übernommen");
+  cxApply(await api(`/api/calc/3mf/library/${file.id}`), model.title);
+}
+async function cxFromMwModel(model) {   // MakerWorld-Modell ohne geladene Datei: Platten aus dem Druckprofil
+  if (!CX.cfg) await cxLoad();
+  cxApply(await api(`/api/calc/3mf/model/${model.id}`), model.title);
+}
+/* Fehlende Platten vom Slicer-Dienst berechnen lassen (läuft im Hintergrund, Abfrage alle 2 s) */
+async function cxSlice() {
+  const j = CX.job; if (!j.info || !j.info.token || CX.slicing) return;
+  const token = j.info.token;
+  try {
+    const { job } = await api("/api/calc/3mf/slice", { method: "POST", body: JSON.stringify({ token }) });
+    CX.slicing = { token, t0: Date.now(), job }; cxRenderNotice();
+    for (;;) {
+      await new Promise(r => setTimeout(r, 2000));
+      const st = await api(`/api/calc/3mf/slice/${job}`);
+      if (st.state === "done") { CX.slicing = null; if (CX.job.info && CX.job.info.token === token) cxApply(st.analysis, CX.job.title); return; }
+      if (st.state === "error") throw new Error(st.error);
+      cxRenderNotice();
     }
+  } catch (e) { CX.slicing = null; if (CX.job.info) CX.job.info.sliceError = e.message; cxSaveJob(); cxRenderNotice(); toast("Slicen fehlgeschlagen"); }
+}
+function cxAllLabel() {
+  const use = CX.job.plates.filter(p => !p.skip), n = CX.job.plates.length;
+  return `Komplett · ${use.length === n ? n : use.length + " von " + n} Platten · ${cxNum(use.reduce((a, x) => a + (+x.hours || 0), 0))} h`;
+}
+function cxRenderNotice() {
+  const el = $("#cxNotice"), j = CX.job, info = j.info || {}, open = j.plates.filter(p => !p.skip && cxOpen(p));
+  const sl = CX.slicer || {}, canSlice = !!(info.token && sl.available);
+  let h = "";
+  if (CX.slicing && CX.slicing.token === info.token) {
+    h = `<div class="cx-note run"><span class="cx-spin" aria-hidden="true"></span><div><b>Bambu Studio slict das Projekt …</b>
+      <span>${Math.round((Date.now() - CX.slicing.t0) / 1000)} s · je nach Größe einige Sekunden bis Minuten. Die Seite kann offen bleiben.</span></div></div>`;
+  } else if (open.length && j.source !== "manual") {
+    const names = open.map(p => `Platte ${p.n}`).join(", ");
+    h = `<div class="cx-note warn"><div><b>${open.length === j.plates.length ? "Diese 3MF enthält keine Druckzeiten und kein Filamentgewicht" : `Ohne Werte: ${esc(names)}`}</b>
+      <span>Bambu Studio speichert beides nur für Platten, die vor dem Speichern geslict wurden – bei normalen Projektdateien und den meisten MakerWorld-Downloads fehlen sie.
+      ${canSlice ? "Der Slicer-Dienst berechnet sie mit den Einstellungen aus der Datei." : info.token ? `Trage Zeit und Gramm ein, exportiere in Bambu Studio über „Platte slicen → Export plate sliced file“ – oder aktiviere den Slicer-Dienst (README, Abschnitt „Slicer-Dienst“), dann geht es hier per Knopfdruck.` : "Zeit und Gramm bitte eintragen."}</span>
+      ${info.sliceError ? `<span class="cx-err">Letzter Versuch: ${esc(info.sliceError)}</span>` : ""}
+      ${(info.failed || []).length ? `<span class="cx-err">Vom Slicer nicht berechenbar: Platte ${info.failed.join(", ")} – Werte eintragen oder, falls sie nicht gedruckt wird, über „Platte entfernen“ löschen.</span>` : ""}</div>
+      ${canSlice ? `<button type="button" class="primary" id="cxSliceBtn">${(info.failed || []).length || info.sliceError ? "Erneut slicen" : "Jetzt slicen"}</button>` : ""}</div>`;
   }
-  if (!plates.length) {
-    if (file.analyzing) return toast("Datei wird noch ausgewertet – gleich nochmal versuchen");
-    // nicht geslict laut Analyse → Datei selbst lesen (G-Code-Kopf bzw. Projekt ohne Slice-Daten)
-    const res = await fetch(`/api/library/files/${file.id}/${encodeURIComponent(file.name)}`);
-    if (!res.ok) return toast("Datei konnte nicht geladen werden");
-    const blob = await res.blob();
-    return cxImportFile(new File([blob], file.name));
-  }
-  cxUseJob(plates, file.name, `${model.title} · ${plates.length} ${plates.length === 1 ? "Druckplatte" : "Druckplatten"} · aus der Bibliothek`, "library", model.title);
-  toast("In die Kalkulation übernommen");
+  h += (info.notes || []).map(t => `<div class="cx-note"><div><span>${esc(t)}</span></div></div>`).join("");
+  el.innerHTML = h; el.hidden = !h;
 }
 async function cxOpenLib() {
   $("#cxLibDlg").showModal(); CX.libSel = null; $("#cxLibQ").value = "";
-  CX.libModels = (await api("/api/library/models?sort=updated")).filter(m => (m.kinds || []).includes("3mf"));
+  CX.libModels = (await api("/api/library/models?sort=updated")).filter(m => (m.kinds || []).includes("3mf") || m.mw_url);
   cxRenderLib();
 }
 function cxRenderLib() {
   if (CX.libSel) {
     const m = CX.libSel, fl = m.file_list.filter(f => f.kind === "3mf");
     $("#cxLibList").innerHTML = `<button type="button" class="ghost mini" data-libback>← zurück</button><h3>${esc(m.title)}</h3>` + (fl.map(f => {
-      const pl = ((f.meta && f.meta.plates) || []).filter(p => p.seconds);
+      const all = (f.meta && f.meta.plates) || [], pl = all.filter(p => p.seconds);
       return `<button type="button" class="cx-libitem" data-libfile="${f.id}" ${f.analyzing ? "disabled" : ""}>
         ${f.thumb ? `<img src="${esc(f.thumb)}" alt="" loading="lazy">` : `<span class="cx-libph">3MF</span>`}
-        <span><b>${esc(f.name)}</b><small class="muted">${pl.length ? `${pl.length} ${pl.length === 1 ? "Platte" : "Platten"} · ${cxNum(f.seconds / 3600, 1)} h · ${cxNum(f.grams, 0)} g` : f.analyzing ? "wird ausgewertet …" : m.mw_design_id ? "Zeiten aus dem MakerWorld-Druckprofil" : "nicht geslict – Zeit und Gramm von Hand"}</small></span></button>`;
-    }).join("") || `<p class="muted">Keine 3MF-Datei in diesem Modell.</p>`);
+        <span><b>${esc(f.name)}</b><small class="muted">${f.analyzing ? "wird ausgewertet …" : pl.length ? `${pl.length === all.length ? pl.length : pl.length + " von " + all.length} ${all.length === 1 ? "Platte" : "Platten"} mit Werten · ${cxNum(f.seconds / 3600, 1)} h · ${cxNum(f.grams, 0)} g` : m.mw_design_id ? `${all.length || ""} ${all.length === 1 ? "Platte" : "Platten"} · Werte aus dem MakerWorld-Druckprofil` : `${all.length || ""} ${all.length === 1 ? "Platte" : "Platten"} · ohne Druckzeiten gespeichert`}</small></span></button>`;
+    }).join("") || (m.mw_design_id ? `<button type="button" class="cx-libitem" data-libmw="1"><span class="cx-libph">MW</span>
+        <span><b>Ohne Datei kalkulieren</b><small class="muted">Platten, Zeiten und Gramm aus dem MakerWorld-Druckprofil${m.mw_instance_title ? " „" + esc(m.mw_instance_title) + "“" : ""}</small></span></button>` : `<p class="muted">Keine 3MF-Datei in diesem Modell.</p>`));
     return;
   }
   const q = $("#cxLibQ").value.trim().toLowerCase(), list = (CX.libModels || []).filter(m => !q || m.title.toLowerCase().includes(q) || (m.tags || []).some(t => t.includes(q)));
   $("#cxLibList").innerHTML = list.map(m => `<button type="button" class="cx-libitem" data-libmodel="${m.id}">
       ${m.cover ? `<img src="${esc(m.cover)}" alt="" loading="lazy">` : `<span class="cx-libph">3MF</span>`}
       <span><b>${esc(m.title)}</b><small class="muted">${esc(m.creator || "")}${m.tags.length ? " · #" + m.tags.slice(0, 3).map(esc).join(" #") : ""}</small></span></button>`).join("")
-    || `<p class="muted">Keine Modelle mit 3MF-Datei gefunden.</p>`;
+    || `<p class="muted">Keine Modelle mit 3MF-Datei oder MakerWorld-Profil gefunden.</p>`;
 }
 
 /* ---------- PDF ---------- */
@@ -493,9 +471,11 @@ cxTab.addEventListener("input", e => {
   }
   else if (el.id && el.id.startsWith("cq")) { store.set(el.id, el.value); }
   else return;
-  if (el.id === "cxH") {
-    const b = $(`#cxPlates [data-plate="${j.plate}"]`); if (b) b.textContent = `Platte ${p.n} · ${cxNum(p.hours)} h`;
-    const a = $("#cxPlates [data-scope=all]"); if (a) a.textContent = `Komplett · ${j.plates.length} Platten · ${cxNum(j.plates.reduce((s, x) => s + (+x.hours || 0), 0))} h`;
+  if (el.id === "cxH" || el.dataset.grams !== undefined) {
+    const b = $(`#cxPlates [data-plate="${j.plate}"]`);
+    if (b) { b.textContent = `Platte ${p.n}${p.name ? " · " + p.name : ""} · ${+p.hours > 0 ? cxNum(p.hours) + " h" : "–"}`; b.classList.toggle("open", cxOpen(p)); }
+    const a = $("#cxPlates [data-scope=all]"); if (a) a.textContent = cxAllLabel();
+    cxRenderNotice();
   }
   cxSaveJob(); cxRenderResult();
 });
@@ -504,6 +484,7 @@ cxTab.addEventListener("change", e => {
   const c = CX.cfg;
   if (el.id === "cxPrinter") { CX.job.printer = el.value; cxSaveCfg(); }
   else if (el.id === "cxProfile") { CX.job.profile = el.value; cxSaveCfg(); }
+  else if (el.id === "cxUse") { cxPlate().skip = !el.checked; cxSaveJob(); return cxRenderCalc(); }
   else if (el.dataset.line !== undefined) { cxPlate().lines[+el.dataset.line].fil = +el.value; cxSaveJob(); return cxRenderCalc(); }
   else if (el.id === "csCur") { c.settings.cur = el.value; cxSaveCfg(); cxRenderCosts(); }
   else if (el.id === "csRound") { c.settings.round = el.value; cxSaveCfg(); }
@@ -530,6 +511,7 @@ cxTab.addEventListener("click", e => {
   else if (b.id === "cxDelPlate") { if (j.plates.length < 2) return; const [x] = j.plates.splice(j.plate, 1); j.plate = Math.min(j.plate, j.plates.length - 1); toast(`Platte ${x.n} entfernt`); }
   else if (b.id === "cxAddExtra") { j.extras.push({ name: "Neues Zubehör", price: 0.1, n: 1 }); }
   else if (b.id === "cxNew") { CX.job = cxNewJob(); toast("Neues Projekt – Werte eintragen"); }
+  else if (b.id === "cxSliceBtn") { return cxSlice(); }
   else if (b.id === "cxFromLib") { return cxOpenLib().catch(err => toast("Bibliothek: " + err.message)); }
   else if (b.id === "cxToQuote") { if (!cxVal("#cqNo")) cxNextNo().catch(() => {}); return cxSetSub("quote"); }
   else if (b.id === "cqNewNo") { return cxNextNo().catch(err => toast("Nummer: " + err.message)); }
@@ -552,8 +534,9 @@ $("#cxLibDlg").addEventListener("click", async e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.libback !== undefined) { CX.libSel = null; return cxRenderLib(); }
   if (b.dataset.libmodel) { CX.libSel = await api(`/api/library/models/${b.dataset.libmodel}`); const fl = CX.libSel.file_list.filter(f => f.kind === "3mf");
-    if (fl.length === 1 && ((fl[0].meta && (fl[0].meta.plates || []).some(p => p.seconds)) || CX.libSel.mw_design_id)) { $("#cxLibDlg").close(); return cxFromLibraryFile(CX.libSel, fl[0]).catch(err => toast("Kalkulation: " + err.message)); }
+    if (fl.length === 1 && !fl[0].analyzing) { $("#cxLibDlg").close(); return cxFromLibraryFile(CX.libSel, fl[0]).catch(err => toast("Kalkulation: " + err.message)); }
     return cxRenderLib(); }
+  if (b.dataset.libmw) { $("#cxLibDlg").close(); return cxFromMwModel(CX.libSel).catch(err => toast("Kalkulation: " + err.message)); }
   if (b.dataset.libfile) { const f = CX.libSel.file_list.find(x => x.id === +b.dataset.libfile); $("#cxLibDlg").close(); cxFromLibraryFile(CX.libSel, f).catch(err => toast("Kalkulation: " + err.message)); }
 });
 $("#cxLibQ").addEventListener("input", () => cxRenderLib());

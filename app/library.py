@@ -174,6 +174,18 @@ def delete_model_files(c, mid):
 
 
 # ---------------------------------------------------------------- Ausgabe
+def set_plates(fid: int, plates: list):
+    """Plattenwerte (z. B. vom Slicer-Dienst) in die Datei-Metadaten übernehmen – die Bibliothek zeigt sie dann an."""
+    with conn() as c:
+        r = c.execute("SELECT meta FROM lib_files WHERE id=?", (fid,)).fetchone()
+        if not r:
+            return
+        meta = json.loads(r["meta"]) if r["meta"] else {}
+        meta["plates"] = [{**p, "seconds": p.get("seconds") or None, "grams": p.get("grams") or None} for p in plates]
+        meta["sliced"] = any(p.get("seconds") for p in plates)
+        c.execute("UPDATE lib_files SET meta=? WHERE id=?", (json.dumps(meta, ensure_ascii=False), fid))
+
+
 def file_out(f) -> dict:
     meta = json.loads(f["meta"] or "{}") if f["meta"] else None
     plates = (meta or {}).get("plates") or []
@@ -518,7 +530,7 @@ def cleanup(apply: bool = False, dups: bool = False) -> dict:
         for fid, f in files.items():
             if not file_path(fid, f["kind"]).exists():
                 rep["missing_files"].append({"id": fid, "model_id": f["model_id"], "name": f["name"]})
-            elif not thumb_path(fid).exists() and f["meta"] is not None and '"error"' not in (f["meta"] or ""):
+            elif f["has_thumb"] and not thumb_path(fid).exists():   # hatte eine Vorschau, Bild ist weg
                 rep["missing_thumbs"].append({"id": fid, "name": f["name"]})
         missing = {x["id"] for x in rep["missing_files"]}
         # gleicher Inhalt in mehreren Modellen

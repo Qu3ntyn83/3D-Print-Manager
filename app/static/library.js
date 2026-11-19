@@ -207,7 +207,7 @@ function libRenderFiles() {
         <small class="muted">${libFileInfo(x)}</small></div>
       <div class="lib-facts">
         <button type="button" class="ghost mini" data-fact="view" title="3D-Vorschau">3D</button>
-        ${x.kind === "3mf" && x.seconds ? `<button type="button" class="ghost mini" data-fact="calc" title="Druckkosten und Angebot berechnen">Kalkulieren</button>` : ""}
+        ${x.kind === "3mf" && !x.analyzing ? `<button type="button" class="ghost mini" data-fact="calc" title="Druckkosten und Angebot berechnen${x.seconds ? "" : " – Datei enthält keine Druckzeiten, Werte kommen aus MakerWorld-Profil, Slicer-Dienst oder von Hand"}">Kalkulieren</button>` : ""}
         <a class="ghost mini btnlike" href="${esc(studioLink(x))}" title="In Bambu Studio öffnen (Bambu Studio muss installiert sein)">Studio</a>
         <a class="ghost mini btnlike" href="${esc(x.url)}" download title="Herunterladen">⤓</a>
         ${x.thumb ? `<button type="button" class="ghost mini" data-fact="cover" title="Als Titelbild verwenden">★</button>` : ""}
