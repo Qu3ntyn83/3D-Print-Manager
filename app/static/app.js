@@ -1216,7 +1216,7 @@ applyTheme(document.documentElement.dataset.theme || "dark");
   if (q.get("tab")) state.tab = q.get("tab");
   if (q.get("unit")) state.openUnit = +q.get("unit");
   if (q.get("fil")) state.openFil = +q.get("fil");
-  if (q.get("unit") || q.get("fil")) { state.tab = "filaments"; history.replaceState(null, "", "/"); }
+  if (q.get("unit") || q.get("fil")) { state.tab = "filaments"; history.replaceState(null, "", (window.__PREFIX__ || "") + "/"); }
   if (["grid", "table", "check"].includes(q.get("view"))) {
     state.view = q.get("view");
     $$("button[data-view]").forEach(x => x.classList.toggle("active", x.dataset.view === state.view));

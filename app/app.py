@@ -461,6 +461,51 @@ def import_json():
     return jsonify({"ok": True})
 
 
+# ── Betrieb hinter einem Unterpfad (Home Assistant Ingress) ─────────────────
+# HA (hass_ingress / Supervisor) leitet die App unter /api/ingress/<name>/ durch und
+# schickt den Pfad im Header X-Ingress-Path. Die Oberfläche nutzt absolute Pfade
+# (/api, /static, /uploads …); die werden hier nur für solche Anfragen umgeschrieben.
+# Alternativ fester Präfix per Umgebungsvariable URL_PREFIX. Ohne beides: keine Änderung.
+import re as _re  # noqa: E402
+
+_PREFIX_OK = _re.compile(r"^/[A-Za-z0-9_\-./]*$")
+_PREFIX_PATHS = r"(?:api/|static/|uploads/|sw\.js|manifest\.webmanifest)"
+_PREFIX_ASSET = _re.compile(r"""(["'`(])/(?=%s)""" % _PREFIX_PATHS)
+_PREFIX_HTML_ROOT = _re.compile(r"""((?:href|action)=")/(?=["?])""")
+_PREFIX_TYPES = ("text/html", "application/javascript", "text/javascript", "text/css", "application/manifest+json")
+
+
+def url_prefix() -> str:
+    p = (request.headers.get("X-Ingress-Path") or os.environ.get("URL_PREFIX") or "").rstrip("/")
+    return p if p and _PREFIX_OK.match(p) and ".." not in p else ""
+
+
+def prefix_text(text: str, prefix: str, html: bool = False) -> str:
+    """Setzt den Präfix vor absolute App-Pfade in HTML/JS/CSS."""
+    text = _PREFIX_ASSET.sub(lambda m: m.group(1) + prefix + "/", text)
+    if html:
+        text = _PREFIX_HTML_ROOT.sub(lambda m: m.group(1) + prefix + "/", text)
+        text = text.replace("<head>", f'<head><script>window.__PREFIX__={json.dumps(prefix)};</script>', 1)
+    return text
+
+
+@app.after_request
+def _apply_prefix(resp):
+    prefix = url_prefix()
+    if not prefix:
+        return resp
+    loc = resp.headers.get("Location")
+    if loc and loc.startswith("/") and not loc.startswith("//") and not loc.startswith(prefix + "/"):
+        resp.headers["Location"] = prefix + loc
+    if resp.status_code == 200 and resp.mimetype in _PREFIX_TYPES:
+        resp.direct_passthrough = False
+        body = resp.get_data(as_text=True)
+        resp.set_data(prefix_text(body, prefix, html=resp.mimetype == "text/html"))
+        resp.headers.pop("ETag", None)
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 def _asset_version() -> str:
     """Kurzer Hash über Skripte und Styles – wechselt mit jedem Update, hängt als ?v= an den Links."""
     import hashlib

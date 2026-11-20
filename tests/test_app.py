@@ -527,3 +527,29 @@ def test_makerworld_plates_for_calc(client, monkeypatch):
     r = client.get(f"/api/makerworld/plates/{mid}").json
     assert [(p["index"], p["seconds"], p["filaments"][0]["g"]) for p in r["plates"]] == [(1, 5910, 38.0), (2, 6809, 43.0)]
     assert client.get(f"/api/library/models/{mid}").json["mw_plates"][1]["filaments"][0]["type"] == "PETG"
+
+
+def test_ingress_prefix_rewrites_paths(client):
+    hdr = {"X-Ingress-Path": "/api/ingress/print_manager"}
+    html = client.get("/", headers=hdr).get_data(as_text=True)
+    assert 'href="/api/ingress/print_manager/static/style.css' in html
+    assert 'window.__PREFIX__="/api/ingress/print_manager"' in html
+    assert 'href="/static/' not in html
+    js = client.get("/static/app.js", headers=hdr).get_data(as_text=True)
+    assert '"/api/ingress/print_manager/api/' in js or '`/api/ingress/print_manager/api/' in js
+    assert '"/uploads/' not in js
+    css = client.get("/static/style.css", headers=hdr).get_data(as_text=True)
+    assert "url(/static/" not in css
+    r = client.get("/s/1", headers=hdr)
+    assert r.headers["Location"].startswith("/api/ingress/print_manager/")
+
+
+def test_no_prefix_without_header(client):
+    html = client.get("/").get_data(as_text=True)
+    assert 'href="/static/style.css' in html
+    assert "__PREFIX__" not in html
+
+
+def test_ingress_prefix_rejects_bad_header(client):
+    html = client.get("/", headers={"X-Ingress-Path": '/x"><script>'}).get_data(as_text=True)
+    assert "__PREFIX__" not in html
