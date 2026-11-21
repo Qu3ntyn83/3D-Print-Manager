@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -29,15 +29,16 @@ jobs:
             echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
             echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
           else
-            echo "::warning::Secret ANDROID_KEYSTORE_BASE64 fehlt – APK wird nur mit Debug-Schlüssel signiert (nicht als Update installierbar)."
+            echo "::error::Secrets ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD fehlen – APK nur mit Debug-Schlüssel, Release „android“ wird NICHT aktualisiert (Download-Link bleibt leer)."
           fi
       - name: Tests und APK bauen
         working-directory: android
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          APP_VERSION_CODE: ${{ github.run_number }}
-          APP_VERSION_NAME: 1.${{ github.run_number }}
         run: |
+          # Versionsnummer 100 + Lauf: muss höher sein als die von Hand veröffentlichte 1.100, sonst kein Update
+          export APP_VERSION_CODE=$((100 + GITHUB_RUN_NUMBER)) APP_VERSION_NAME=1.$((100 + GITHUB_RUN_NUMBER))
+          echo "APP_VERSION_NAME=$APP_VERSION_NAME" >> "$GITHUB_ENV"
           chmod +x gradlew
           ./gradlew --no-daemon testReleaseUnitTest assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/3D-Manager.apk"
@@ -54,5 +55,6 @@ jobs:
           make_latest: false
           body: |
             3D Print Manager als Android-App mit NFC-Leser für Bambu-RFID-Tags.
-            Version 1.${{ github.run_number }} · Auf dem Handy herunterladen und installieren (Installation aus unbekannten Quellen erlauben).
+            Version ${{ env.APP_VERSION_NAME }} · Auf dem Handy herunterladen und installieren (Installation aus unbekannten Quellen erlauben).
+            Nicht löschen: Die App im 3D Print Manager (⋯ → „Android-App mit NFC laden“) lädt die Datei von diesem Release.
           files: 3D-Manager.apk
