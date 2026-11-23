@@ -390,15 +390,9 @@ async function cxLogoPng(dataUrl) {
   c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
   return { data: c.toDataURL("image/png"), ratio: c.width / c.height };
 }
-async function cxDefaultLogo() {
-  try { await document.fonts.load("italic 700 21px 'Chakra Petch'"); } catch {}
-  const S = 4, c = document.createElement("canvas"); c.width = c.height = 64 * S; const x = c.getContext("2d"); x.scale(S, S);
-  const g = x.createLinearGradient(0, 0, 64, 64); g.addColorStop(0, "#2fe29b"); g.addColorStop(1, "#36a9ff");
-  const r = 14; x.beginPath(); x.moveTo(2 + r, 2); x.arcTo(62, 2, 62, 62, r); x.arcTo(62, 62, 2, 62, r); x.arcTo(2, 62, 2, 2, r); x.arcTo(2, 2, 62, 2, r); x.closePath();
-  x.fillStyle = "#0b1630"; x.fill(); x.lineWidth = 3; x.strokeStyle = g; x.stroke(); x.lineCap = "round"; x.lineJoin = "round";
-  x.stroke(new Path2D("M15 20 L9 32 L15 44")); x.stroke(new Path2D("M49 20 L55 32 L49 44"));
-  x.fillStyle = "#e5eefc"; x.font = "italic 700 21px 'Chakra Petch', sans-serif"; x.textAlign = "center"; x.fillText("#PS", 32, 40);
-  x.fillStyle = g; x.fill(new Path2D("M37 9 L30 22 L35 22 L31 31 L41 17 L36 17 L39 9 Z"));
+async function cxDefaultLogo() {  // Standard-Logo (App-Icon) als PNG für das PDF
+  const img = new Image(); img.src = "/static/icons/icon-192.png"; await img.decode();
+  const c = document.createElement("canvas"); c.width = c.height = 256; c.getContext("2d").drawImage(img, 0, 0, 256, 256);
   return c.toDataURL("image/png");
 }
 async function cxPdf() {
