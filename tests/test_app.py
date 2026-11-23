@@ -553,3 +553,25 @@ def test_no_prefix_without_header(client):
 def test_ingress_prefix_rejects_bad_header(client):
     html = client.get("/", headers={"X-Ingress-Path": '/x"><script>'}).get_data(as_text=True)
     assert "__PREFIX__" not in html
+
+
+def test_spule_oder_refill_schliessen_sich_aus(client):
+    fid = client.post("/api/filaments", json={"brand": "T", "material": "PLA", "color_name": "Pack-Test", "qty": 2, "spool": True, "refill": False,
+                                                "colors": ["#112233FF"], "sealed": True}).get_json()["id"]
+
+    def packs():
+        return [(u["spool"], u["refill"]) for u in client.get(f"/api/filaments/{fid}").get_json()["units"]]
+    assert packs() == [(1, 0), (1, 0)]
+    uid = client.get(f"/api/filaments/{fid}").get_json()["units"][0]["id"]
+    client.patch(f"/api/units/{uid}", json={"refill": True})                # Refill → Spule aus
+    assert packs()[0] == (0, 1)
+    client.patch(f"/api/units/{uid}", json={"spool": True})                 # Spule → Refill aus
+    assert packs()[0] == (1, 0)
+    client.patch(f"/api/units/{uid}", json={"spool": False})                # Spule „nein“ → Refill
+    assert packs()[0] == (0, 1)
+    client.patch(f"/api/filaments/{fid}", json={"refill": False})           # ganze Sorte: Refill „nein“ → Spule
+    assert packs() == [(1, 0), (1, 0)]
+    client.patch(f"/api/units/{uid}", json={"spool": True, "refill": True})  # beides → Refill gewinnt
+    assert packs()[0] == (0, 1)
+    nid = client.post("/api/units", json={"filament_id": fid, "spool": True, "refill": True}).get_json()["id"]
+    assert [(u["spool"], u["refill"]) for u in client.get(f"/api/filaments/{fid}").get_json()["units"] if u["id"] == nid] == [(0, 1)]

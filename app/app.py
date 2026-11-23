@@ -155,6 +155,7 @@ def _import(conn, data, replace=False):
         cur = conn.execute(f"INSERT INTO filaments ({','.join(c)}) VALUES ({','.join('?' * len(c))})", list(c.values()))
         for u in f.get("units") or []:
             vals = {k: u.get(k) for k in unit_cols if k in u}
+            vals.update(units.pack_vals({k: vals[k] for k in ("spool", "refill") if k in vals}))
             vals.update(filament_id=cur.lastrowid, remaining_src="manual", created_at=date.today().isoformat())
             conn.execute(f"INSERT INTO spool_units ({','.join(vals)}) VALUES ({','.join('?' * len(vals))})", list(vals.values()))
     for m in data.get("materials", []):

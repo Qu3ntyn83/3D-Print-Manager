@@ -252,7 +252,8 @@ function togCell(f, k) {
   return `<td class="c nolink" title="${title}"><input type="checkbox" class="tog" data-f="${k}" ${n === of ? "checked" : ""} ${part ? "data-part" : ""} ${k === "sealed" ? "disabled" : ""} aria-label="${title}">${part ? `<small class="muted">${n}/${of}</small>` : ""}</td>`;
 }
 async function toggleField(id, field, val) {
-  const upd = await api(`/api/filaments/${id}`, { method: "PATCH", body: JSON.stringify({ [field]: val }) });
+  const body = field === "spool" || field === "refill" ? { spool: field === "spool" ? !!val : !val, refill: field === "refill" ? !!val : !val } : { [field]: val };
+  const upd = await api(`/api/filaments/${id}`, { method: "PATCH", body: JSON.stringify(body) });
   Object.assign(state.fil.find(f => f.id === id), upd);
   renderFil();
 }
@@ -905,7 +906,8 @@ function openFil(f) {
   $("#filDlgTitle").textContent = f ? `${f.color_name}` : "Neues Filament";
   for (const el of filForm.elements) {
     if (!el.name) continue;
-    if (el.type === "checkbox") el.checked = !!d[el.name]; else el.value = d[el.name] ?? "";
+    if (el.type === "radio") el.checked = el.value === (d.refill ? "refill" : "spool");
+    else if (el.type === "checkbox") el.checked = !!d[el.name]; else el.value = d[el.name] ?? "";
   }
   draftColors = [...d.colors];
   renderColorInputs();
@@ -957,6 +959,7 @@ filForm.onsubmit = async e => {
   const body = { colors: draftColors };
   for (const el of filForm.elements) {
     if (!el.name || el.disabled) continue;
+    if (el.type === "radio") { if (el.checked) { body.spool = el.value === "spool"; body.refill = el.value === "refill"; } continue; }
     body[el.name] = el.type === "checkbox" ? el.checked : el.value;
   }
   if (body.last_check === "") body.last_check = null;
