@@ -1182,3 +1182,10 @@ label.file-btn.primary { background: var(--grad); color: var(--accent-ink); bord
 #maintDue { background: var(--danger); color: #fff; }
 .kpi.kpi-link { text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .kpi.kpi-link.bad b { color: var(--danger); }
+
+/* Spule | Refill – genau eines von beiden */
+.packsw { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--panel); vertical-align: middle; }
+.packsw button, .packsw label { margin: 0; padding: 3px 12px; font-size: 12.5px; line-height: 1.4; color: var(--muted); cursor: pointer; border: 0; background: none; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.packsw button.on, .packsw label:has(input:checked) { background: var(--text); color: var(--bg); }
+.packsw input { position: absolute; opacity: 0; pointer-events: none; }
+.packsw label:has(input:focus-visible), .packsw button:focus-visible { outline: 2px solid var(--accent, #2fe29b); outline-offset: -2px; }

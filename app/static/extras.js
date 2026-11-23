@@ -89,8 +89,7 @@ function renderUnits(f) {
     return `<div class="unitrow ${u.status}" data-uid="${u.id}">
       <span class="ucode mono">${u.code}</span>
       <span class="upack"><span class="pill ${u.status === "open" ? "run" : u.status === "sealed" ? "done" : ""}">${STATUS[u.status]}</span>${u.status !== "empty" ? `
-        <button type="button" class="chip ${u.spool ? "on" : ""}" data-up="spool" aria-pressed="${!!u.spool}" title="Mit Spule geliefert">Spule</button>
-        <button type="button" class="chip ${u.refill ? "on" : ""}" data-up="refill" aria-pressed="${!!u.refill}" title="Refill (ohne Spule)">Refill</button>` : ""}</span>
+        <span class="packsw" role="group" aria-label="Verpackung"><button type="button" class="${u.refill ? "" : "on"}" data-up="spool" aria-pressed="${!u.refill}" title="Mit Spule geliefert">Spule</button><button type="button" class="${u.refill ? "on" : ""}" data-up="refill" aria-pressed="${!!u.refill}" title="Refill (ohne Spule)">Refill</button></span>` : ""}</span>
       <span class="ubar">${barI({ grams: u.remaining_g != null ? Math.round(u.remaining_g) : null, total: u.initial_g, percent: u.percent })}<small>${{ ams: "AMS", weighed: "gewogen", slicer: "Slicer", job: "Druck", manual: "manuell", full: "voll" }[u.remaining_src] || ""}</small></span>
       <span class="umeta">${u.tag ? `<button type="button" class="tag ${u.tag.in_ams ? "ams" : "rfid"} tagbtn" data-ua="tag" title="RFID ${esc(u.tag.key)} – Klick: anderen Tag zuordnen">◉ ${u.tag.slot ? esc(slotName(u.tag.slot[0], u.tag.slot[1])) : "Tag"}</button>`
           : u.status !== "empty" ? `<button type="button" class="tag tagbtn add" data-ua="tag" title="RFID-Tag dieser Box zuordnen">◉ + Tag</button>` : ""}
@@ -117,9 +116,9 @@ $("#unitList").addEventListener("click", async e => {
   const pk = e.target.closest("[data-up]");
   if (pk) {
     const uid = +pk.closest(".unitrow").dataset.uid, k = pk.dataset.up, u = editing.units.find(x => x.id === uid);
-    const body = { [k]: !u[k] };
-    await api(`/api/units/${uid}`, { method: "PATCH", body: JSON.stringify(body) });
-    await reloadEditing(); return toast(`${u.code}: ${body[k] ? "" : "kein "}${k === "spool" ? "Spule" : "Refill"}`);
+    if (k === "refill" ? !!u.refill : !u.refill) return;   // ist schon so eingestellt
+    await api(`/api/units/${uid}`, { method: "PATCH", body: JSON.stringify({ [k]: true }) });
+    await reloadEditing(); return toast(`${u.code}: ${k === "spool" ? "Spule" : "Refill"}`);
   }
   const b = e.target.closest("[data-ua]"); if (!b) return;
   const uid = +b.closest(".unitrow").dataset.uid, a = b.dataset.ua;
@@ -629,6 +628,8 @@ $("#bulkEdit").onclick = () => {
     const v = commonVal(list, x => !!x[sel.dataset.bb]);
     sel.value = ""; sel.options[0].textContent = v === undefined ? "unverändert" : `unverändert: ${v ? "ja" : "nein"}`; sel.title = v === undefined ? "gemischt" : "";
   });
+  const pk = $("[data-bpack]", f), pv = commonVal(list, x => x.refill && !x.spool ? "refill" : x.spool && !x.refill ? "spool" : "mix");
+  pk.value = ""; pk.options[0].textContent = pv === undefined || pv === "mix" ? "unverändert" : `unverändert: ${pv === "refill" ? "Refill" : "Spule"}`;
   $("#bulkNote").value = "";
   const bs = $("#bulkStudio"); delete bs.dataset.touched; bs.dataset.val = "null";
   const cs = commonVal(list, x => x.studio ? x.studio.filament_id : null);
@@ -648,6 +649,7 @@ function bulkPayload() {
   $$("[data-bs]", f).forEach(i => { const v = val(i, BULK_NUM.has(i.dataset.bs)); if (v !== undefined) { if (Number.isNaN(v)) bad = i; else set[i.dataset.bs] = v; } });
   $$("[data-bp]", f).forEach(i => { const v = val(i, i.dataset.bp !== "notes"); if (v !== undefined) { if (Number.isNaN(v)) bad = i; else profile[i.dataset.bp] = v; } });
   $$("[data-bb]", f).forEach(s => { if (s.value !== "") set[s.dataset.bb] = s.value === "1"; });
+  const pk = $("[data-bpack]", f).value; if (pk) { set.spool = pk === "spool"; set.refill = pk === "refill"; }
   if ($("#bulkStudio").dataset.touched) set.studio = JSON.parse($("#bulkStudio").dataset.val || "null");
   return { set, profile, note: $("#bulkNote").value.trim(), bad };
 }

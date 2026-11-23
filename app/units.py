@@ -44,6 +44,21 @@ def _b(v) -> int:
     return 1 if v in (True, 1, "1", "true", "ja", "on") else 0
 
 
+def pack_vals(v: dict) -> dict:
+    """Spule und Refill schließen sich aus: eine Box ist entweder mit Spule geliefert oder ein Refill.
+    Wird eines von beiden gesetzt, ergibt sich das andere (Refill gewinnt, wenn beides „ja“ ist)."""
+    sp, rf = v.get("spool"), v.get("refill")
+    if sp in (None, "") and rf in (None, ""):
+        return {}
+    if rf not in (None, "") and _b(rf):
+        return {"spool": 0, "refill": 1}
+    if sp not in (None, "") and _b(sp):
+        return {"spool": 1, "refill": 0}
+    if rf not in (None, ""):      # Refill „nein“ → Spule
+        return {"spool": 1, "refill": 0}
+    return {"spool": 0, "refill": 1}  # Spule „nein“ → Refill
+
+
 def now():
     return datetime.now().isoformat(timespec="seconds")
 
@@ -69,6 +84,14 @@ def init_schema():
         if not get_setting(c, "units_v1"):
             migrate(c)
             set_setting(c, "units_v1", now())
+        if not get_setting(c, "pack_excl_v1"):
+            # Spule und Refill schließen sich aus: Boxen mit beidem sind Refills (ohne Spule)
+            c.execute("UPDATE spool_units SET spool=0 WHERE refill=1 AND spool=1")
+            c.execute("UPDATE spool_units SET spool=1 WHERE COALESCE(spool,0)=0 AND COALESCE(refill,0)=0")
+            c.execute("""UPDATE filaments SET
+                           spool=COALESCE((SELECT MAX(u.spool) FROM spool_units u WHERE u.filament_id=filaments.id AND u.status!='empty'), spool),
+                           refill=COALESCE((SELECT MAX(u.refill) FROM spool_units u WHERE u.filament_id=filaments.id AND u.status!='empty'), refill)""")
+            set_setting(c, "pack_excl_v1", now())
 
 
 def _fil(c, fid):
@@ -172,6 +195,11 @@ def add_unit(c, fid, status="sealed", **kw) -> int:
     ref = last or f
     spool = _b(kw["spool"]) if kw.get("spool") not in (None, "") else (ref["spool"] if ref["spool"] is not None else 1)
     refill = _b(kw["refill"]) if kw.get("refill") not in (None, "") else (ref["refill"] or 0)
+    if kw.get("refill") not in (None, "") and kw.get("spool") not in (None, ""):
+        pv = pack_vals({"spool": kw["spool"], "refill": kw["refill"]})
+    else:
+        pv = pack_vals({"refill": refill} if refill else {"spool": spool})
+    spool, refill = pv["spool"], pv["refill"]
     cur = c.execute("""INSERT INTO spool_units (filament_id, status, initial_g, remaining_g, remaining_src, remaining_at,
                        opened_at, price, purchased_at, shop, location, notes, created_at, spool, refill)
                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
@@ -280,7 +308,7 @@ def reconcile_qty(c, fid, target, status="sealed", **kw):
 
 def set_pack(c, fids, vals: dict):
     """Spule/Refill für alle vorhandenen (nicht leeren) Boxen der Sorten setzen."""
-    vals = {k: _b(v) for k, v in vals.items() if k in UNIT_BOOL}
+    vals = pack_vals({k: v for k, v in vals.items() if k in UNIT_BOOL})
     if not vals or not fids:
         return
     q = ",".join("?" * len(fids))
@@ -362,9 +390,7 @@ def edit_unit(uid):
         if not u:
             abort(404)
         vals = {k: (b[k] if b[k] != "" else None) for k in UNIT_FIELDS if k in b}
-        for k in UNIT_BOOL:
-            if k in vals:
-                vals[k] = _b(vals[k])
+        vals.update(pack_vals({k: vals[k] for k in UNIT_BOOL if k in vals}))
         if vals.get("status") == "sealed" and u["status"] == "open":
             vals["opened_at"] = None  # versehentlich geöffnet → wieder OVP
         if "remaining_g" in vals and vals["remaining_g"] is not None:
